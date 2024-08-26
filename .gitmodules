@@ -1,0 +1,3 @@
+[submodule "mmwave_radar_processing/datasets/CPSL_Datasets"]
+	path = mmwave_radar_processing/datasets/CPSL_Datasets
+	url = https://github.com/davidmhunt/CPSL_Datasets.git
