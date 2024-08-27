@@ -83,7 +83,6 @@ class ConfigManager:
         #velocity parameters
         self.vel_res_m_s:float = 0.0
         self.vel_max_m_s:float = 0.0
-        self.vel_bins_m_s:np.ndarray = np.empty(shape=0,dtype=float)
 
         #angle parameters
         self.num_tx_antennas:int = 3
