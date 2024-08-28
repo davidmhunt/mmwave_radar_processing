@@ -9,6 +9,7 @@ from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.datasets.CPSL_Datasets.cpsl_ds import CpslDS
 from mmwave_radar_processing.processors.range_azmith_resp import RangeAzimuthProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
+from mmwave_radar_processing.processors.virtual_array_reformater import VirtualArrayReformatter
 from mmwave_radar_processing.plotting.plotter_mmWave_data import PlotterMmWaveData
 
 class MovieGeneratorMmWaveData:
@@ -18,6 +19,7 @@ class MovieGeneratorMmWaveData:
                  plotter:PlotterMmWaveData,
                  range_azimuth_processor:RangeAzimuthProcessor,
                  range_doppler_processor:RangeDopplerProcessor,
+                 virtual_array_reformatter:VirtualArrayReformatter,
                  temp_dir_path="~/Downloads/odometry_temp",
                  ) -> None:
         
@@ -25,6 +27,7 @@ class MovieGeneratorMmWaveData:
         self.plotter:PlotterMmWaveData = plotter
         self.range_azimuth_processor:RangeAzimuthProcessor = range_azimuth_processor
         self.range_doppler_processor:RangeDopplerProcessor = range_doppler_processor
+        self.virtual_array_reformatter = virtual_array_reformatter
         
         self.temp_dir_path = temp_dir_path
         self.temp_file_name = "frame"
@@ -141,6 +144,9 @@ class MovieGeneratorMmWaveData:
             #get the adc cube
             adc_cube = self.dataset.get_radar_data(idx=i)
 
+            ##reformat it with virtual arrays
+            adc_cube = self.virtual_array_reformatter.process(adc_cube)
+            
             #generate the figure
             self.plotter.plot_compilation(
                 adc_cube=adc_cube,
