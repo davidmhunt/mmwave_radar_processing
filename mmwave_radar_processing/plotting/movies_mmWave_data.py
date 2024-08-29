@@ -6,7 +6,7 @@ import tqdm
 import imageio
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
-from mmwave_radar_processing.datasets.CPSL_Datasets.cpsl_ds import CpslDS
+from cpsl_datasets.cpsl_ds import CpslDS
 from mmwave_radar_processing.processors.range_azmith_resp import RangeAzimuthProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.virtual_array_reformater import VirtualArrayReformatter
