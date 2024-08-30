@@ -13,6 +13,7 @@ class RangeAzimuthProcessor(_Processor):
         #phase shifts
         self.num_angle_bins = num_angle_bins
         self.phase_shifts:np.ndarray = None
+        self.angle_bins:np.ndarray = None
 
         #range bins
         self.num_range_bins:int = None
