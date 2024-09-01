@@ -61,7 +61,17 @@ class RangeAzimuthProcessor(_Processor):
         self.y_s = np.multiply(self.rhos,np.cos(self.thetas))
 
     def process(self, adc_cube: np.ndarray, chirp_idx = 0) -> np.ndarray:
+        """_summary_
 
+        Args:
+            adc_data_cube (np.ndarray): (rx antennas) x (adc samples) x
+                (num_chirps) adc data cube consisting of complex data
+            chirp_idx (int, optional): The chirp to compute the response for.
+              Defaults to 0.
+
+        Returns:
+            np.ndarray: (range bins) x (angle bins) range azimuth response
+        """
         #initialize the data by zero padding the angle bins
         data = np.zeros(
             shape=(
