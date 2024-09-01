@@ -69,8 +69,8 @@ class PlotterMmWaveData:
             shading='gouraud'
         )
 
-        ax.set_xlabel("X (m)",fontsize=self.font_size_axis_labels)
-        ax.set_ylabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
         if convert_to_dB:
             ax.set_title("Range-Azimuth\nHeatmap (dB Cart.)",fontsize=self.font_size_title)
         else:
