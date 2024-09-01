@@ -57,9 +57,13 @@ class PlotterMmWaveData:
         if convert_to_dB:
             resp = 20 * np.log10(resp)
         
+        #rotate the x and y grids so that the x axis is on the y axis
+        x_grid = -1 * range_azimuth_processor.y_s
+        y_grid = range_azimuth_processor.x_s
+
         ax.pcolormesh(
-            range_azimuth_processor.x_s,
-            range_azimuth_processor.y_s,
+            x_grid,
+            y_grid,
             resp,
             cmap=cmap,
             shading='gouraud'

@@ -1,4 +1,4 @@
-# mmWave_Radar_Processing
+# mmwave_radar_processing
 python libraries for processing raw mmWave radar data
 
 ## Installation
@@ -41,12 +41,17 @@ bash Anaconda3-2023.09-0-Linux-x86_64.sh -b
 conda create -n mmWaveRadarProcessing python=3.10
 ```
 
-### 2. Clone mmWave_Radar_Processing
+### 2. Clone mmwave_radar_processing
 ```
-git clone https://github.com/davidmhunt/mmWave_Radar_Processing.git
+git clone https://github.com/davidmhunt/mmwave_radar_processing.git
 ```
 
-### 3. Install mmWave_Radar_Processing using Poetry
+Initialize the submodule
+```
+cd mmwave_radar_processing
+git submodule update --init
+```
+### 3. Install mmwave_radar_processing using Poetry
 
 #### Installing Poetry:
  
@@ -60,8 +65,8 @@ git clone https://github.com/davidmhunt/mmWave_Radar_Processing.git
 curl -sSL https://install.python-poetry.org | python3 -
 ```
 
-#### Installing mmWave_Radar_Processing
-Navigate to the mmWave_Radar_Processing foler (this folder) and execute the following command
+#### Installing mmwave_radar_processing
+Navigate to the mmwave_radar_processing foler (this folder) and execute the following command
 
 ```
 poetry install --with submodules
@@ -72,7 +77,7 @@ If you get an an error saying: "Failed to unlock the collection!", execute the f
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 ```
 
-#### Updating mmWave_Radar_Processing
+#### Updating mmwave_radar_processing
 If the pyproject.toml file is updated, the poetry installation must also be updated. Use the following commands to update the version of poetry
 ```
 poetry lock --no-update
