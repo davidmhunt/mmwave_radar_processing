@@ -48,16 +48,13 @@ class RangeAzimuthProcessor(_Processor):
         #round the last entry to be exactly pi
         self.phase_shifts[-1] = -1 * np.pi
 
-        #fix the phase shifts to be correct
-        self.phase_shifts = self.phase_shifts * -1 #TODO: check this value
-
         #compute the angle bins
         self.angle_bins = np.arcsin(self.phase_shifts / np.pi)
 
         #compute the mesh grid
         self.thetas,self.rhos = np.meshgrid(self.angle_bins,self.range_bins)
-        self.x_s = np.multiply(self.rhos,np.sin(self.thetas))
-        self.y_s = np.multiply(self.rhos,np.cos(self.thetas))
+        self.x_s = np.multiply(self.rhos,np.cos(self.thetas))
+        self.y_s = np.multiply(self.rhos,np.sin(self.thetas))
 
     def process(self, adc_cube: np.ndarray, chirp_idx = 0) -> np.ndarray:
 
