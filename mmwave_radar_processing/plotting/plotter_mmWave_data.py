@@ -173,7 +173,7 @@ class PlotterMmWaveData:
         if convert_to_dB:
             resp = 20 * np.log10(resp)
         
-        ax.imshow(
+        im = ax.imshow(
             np.flip(resp,axis=0),
             extent=[
                 range_doppler_processor.vel_bins[0],
@@ -183,7 +183,6 @@ class PlotterMmWaveData:
             ],
             cmap=cmap
             )
-        
         ax.set_xlabel("Velocity (m/s)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Range (m)",fontsize=self.font_size_axis_labels)
         if convert_to_dB:
@@ -191,6 +190,10 @@ class PlotterMmWaveData:
         else:
             ax.set_title("Range-Doppler\nHeatmap (mag)",fontsize=self.font_size_title)
         ax.tick_params(labelsize=self.font_size_ticks)
+
+        #add the colorbar
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label('Intensity', fontsize=12)
 
         if show:
             plt.show()

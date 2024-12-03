@@ -3,12 +3,14 @@ import scipy.constants as constants
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
+from mmwave_radar_processing.detectors.CFAR import CaCFAR_1D
 
 class SyntheticArrayProcessor(_Processor):
 
     def __init__(
             self,
             config_manager: ConfigManager,
+            cfar:CaCFAR_1D,
             az_angle_bins_rad=\
                 np.deg2rad(np.linspace(
                     start=-30,stop=30,num=60
@@ -23,11 +25,15 @@ class SyntheticArrayProcessor(_Processor):
 
         Args:
             config_manager (ConfigManager): _description_
+            cfar (CaCFAR): _description_
             az_angle_bins_rad (_type_, optional): _description_. Defaults to \np.deg2rad(np.linspace( start=-30,stop=30,num=60 )).
             el_angle_bins_rad (_type_, optional): _description_. Defaults to \np.deg2rad(np.linspace( start=-30, stop=30, num=30 )).
         Notes:
             NOTE: coordinate frame (x - right, y - out, z - up)
         """
+
+        #initialize the cfar detector
+        self.cfar:CaCFAR_1D = cfar
 
         #range bins
         self.num_range_bins:int = None
@@ -48,14 +54,24 @@ class SyntheticArrayProcessor(_Processor):
         self.p_y_m:np.ndarray = None #indexed by [receiver, chirp]
         self.p_z_m:np.ndarray = None #indexed by [receiver, chirp]
 
-        self.array_geometry:np.ndarray = None #indexed by []
+        self.p:np.ndarray = None #indexed by [(x,y,z),receiver,chirp]
+        self.p_reshaped:np.ndarray = None #reshaped for efficient computation
 
-        #mesh grids for spherical plotting
-        self.phis:np.ndarray = None #rotation az w.r.t y-axis
-        self.thetas:np.ndarray = None #
+        #compute the beam pointing vectors
+        self.az_angle_bins_rad = az_angle_bins_rad
+        self.el_angle_bins_rad = el_angle_bins_rad
+        self.d:np.ndarray = None #indexed by [(x,y,z), theta, phis]
+
+        #define the output grid
+        self.beamformed_resp:np.ndarray = None #indexed by [rho, theta, phi]
+        self.beamformed_dets:np.ndarray = None #cfar dets indexed by [rho, theta, phi]
+
+        #mesh grids for spherical plotting - indexed by (rho, theta, phi)
         self.rhos:np.ndarray = None
+        self.thetas:np.ndarray = None #az w.r.t y-axis
+        self.phis:np.ndarray = None #el w.r.t y-axis
 
-        #mesh grid for cartesian plotting
+        #mesh grid for cartesian plotting - indexed by (rho, theta, phi) idx
         self.x_s:np.ndarray = None
         self.y_s:np.ndarray = None
         self.z_s:np.ndarray = None
@@ -64,22 +80,33 @@ class SyntheticArrayProcessor(_Processor):
         super().__init__(config_manager)
 
     def configure(self):
-        
-        #configure the range bins
-        self.num_range_bins = self.config_manager.get_num_adc_samples(
-            profile_idx=0
-        )
-        self.range_bins = np.arange(
-            start=0,
-            stop=self.config_manager.range_max_m,
-            step=self.config_manager.range_res_m
-        )
 
+        #compute key radar parameters
         self._compute_key_radar_parameters()
+
+        #compute output mesh grids
+        self._compute_mesh_grids()
+        
+        #compute the beam stearing vectors
+        self._compute_beam_stearing_vectors()
+
+        #define the output grid
+        self._init_out_resp()
 
         return
      
     def _compute_key_radar_parameters(self):
+
+        #configure the range bins
+        self.num_range_bins = self.config_manager.get_num_adc_samples(
+            profile_idx=0
+        )
+        
+        self.range_bins = np.linspace(
+            start=0,
+            stop=self.config_manager.range_max_m,
+            num=self.num_range_bins
+        )
 
         #compute the radar wavelength
         start_freq_GHz = \
@@ -130,7 +157,26 @@ class SyntheticArrayProcessor(_Processor):
         self.chirp_rx_positions_m[:,self.chirp_tx_masks == 4] +=\
               self.lambda_m * 2
 
-        
+        return
+    
+    def _compute_mesh_grids(self):
+
+        #generate the mesh grid for the beamformed response
+        self.rhos, self.thetas, self.phis = np.meshgrid(
+            self.range_bins,self.az_angle_bins_rad,self.el_angle_bins_rad,
+            indexing="ij"
+        )
+
+        self.x_s = np.multiply(
+            np.multiply(self.rhos,np.sin(self.thetas)),
+            np.cos(self.phis)
+        )
+        self.y_s = np.multiply(
+            np.multiply(self.rhos,np.cos(self.thetas)),
+            np.cos(self.phis)
+        )
+        self.z_s = np.multiply(self.rhos,np.sin(self.phis))
+
         return
 
     def _generate_array_geometries(
@@ -166,7 +212,7 @@ class SyntheticArrayProcessor(_Processor):
         chirp_coords = self.chirp_start_times_us * 1e-6 * vels[1]
         self.p_y_m = np.tile(
             chirp_coords,
-            reps=self.config_manager.num_rx_antennas)
+            reps=(self.config_manager.num_rx_antennas,1))
         
         #compute the z coordinates (based on platform motion and array geometry)
         """
@@ -182,13 +228,129 @@ class SyntheticArrayProcessor(_Processor):
             reps=(self.config_manager.num_rx_antennas,1))
         self.p_z_m = self.chirp_rx_positions_m + positions_vel
         
+        #save newly generated array geometry
+        self.p = np.array([self.p_x_m,self.p_y_m,self.p_z_m])
+        self.p_reshaped = np.reshape(
+            self.p,
+            (self.p.shape[0],-1),
+            order="F"
+        )
 
+    def _compute_beam_stearing_vectors(self):
 
+        #generate a mesh grid
+        thetas, phis = np.meshgrid(
+            self.az_angle_bins_rad,
+            self.el_angle_bins_rad,
+            indexing="ij")
 
-    def _compute_mesh_grids(self):
+        #compute the x,y,z coordinates of the beamforming
+        x = np.multiply(np.sin(thetas),np.cos(phis))
+        y = np.multiply(np.cos(thetas),np.cos(phis))
+        z = np.sin(phis)
 
-        pass
+        #save the pointing vectors
+        self.d = np.array([x,y,z])
+
+    def _init_out_resp(self):
+
+        self.beamformed_resp = np.zeros(
+            shape=(self.range_bins.shape[0],
+                   self.az_angle_bins_rad.shape[0],
+                   self.el_angle_bins_rad.shape[0]),
+            dtype=complex
+        )
+
+        self.beamformed_dets = np.zeros(
+            shape=(self.range_bins.shape[0],
+                   self.az_angle_bins_rad.shape[0],
+                   self.el_angle_bins_rad.shape[0]),
+            dtype=bool
+        )
+
+    def compute_response_at_stearing_angle(
+            self,
+            adc_cube_reshaped:np.ndarray,
+            steering_vector:np.ndarray
+    )->np.ndarray:
+        """Compute the beamformed range response for a given steering
+            vector
+
+        Args:
+            adc_cube_reshaped (np.ndarray): The input adc cube indexed by
+                [adc_sample, receiver, and chirp]. NOTE: this must be the 
+                same order as the array geometry's p vector which is indexed
+                by [(x,y,z), receiver, chirp]
+            stearing_vector (np.ndarray): the stearing vector to compute the 
+                response along expressed as an [x,y,z] unit vector
+
+        Returns:
+            np.ndarray: the beamformed range response as a complex signal
+        """
+
+        #reshape the adc cube further
+        adc_cube_reshaped = np.reshape(
+                            adc_cube_reshaped,
+                            (adc_cube_reshaped.shape[0],-1),
+                            order="F"
+                        )
+
+        #compute the phase shift to apply to each received signal
+        shifts = np.exp(
+                    1j * 2 * np.pi * \
+                    (steering_vector @ self.p_reshaped) / self.lambda_m)
+
+        #apply the phase shifts
+        #reshape the shifts to be correct
+        shifts = np.reshape(shifts,(1,shifts.shape[0]))
+        beamformed_resps = np.multiply(adc_cube_reshaped,shifts)
+        beamformed_resp = np.sum(beamformed_resps,axis=1)
+
+        #generate a hanning window
+        window = np.hanning(self.num_range_bins)
+
+        #compute the response
+        return np.fft.fft(beamformed_resp * window)
 
     def process(self,adc_cube:np.ndarray) -> np.ndarray:
+        """Compute the beamformed synthetic response
 
-        pass
+        Args:
+            adc_cube (np.ndarray): the adc cube for the synthetic array
+                indexed by [receiver, sample, and chirp]
+        Returns:
+            np.ndarray: _description_
+        """
+
+        #reshpae the adc cube accordingly
+        adc_cube_reshaped = np.transpose(adc_cube,axes=(1,0,2))
+
+        #reset the CFAR detector
+        self.beamformed_dets = np.zeros(
+            shape=(self.range_bins.shape[0],
+                   self.az_angle_bins_rad.shape[0],
+                   self.el_angle_bins_rad.shape[0]),
+            dtype=bool
+        )
+
+        for az_angle_idx in range(self.az_angle_bins_rad.shape[0]):
+            for el_angle_idx in range(self.el_angle_bins_rad.shape[0]):
+
+                steering_vector = self.d[:,az_angle_idx,el_angle_idx]
+
+                #get beamformed response at the stearing angle
+                resp = self.compute_response_at_stearing_angle(
+                    adc_cube_reshaped=adc_cube_reshaped,
+                    steering_vector=steering_vector
+                )
+
+                #get the cfar detections
+                det_idxs,T = self.cfar.compute(resp)
+
+                #save the response and the cfar detections
+                self.beamformed_resp[:,az_angle_idx,el_angle_idx] = resp
+                self.beamformed_dets[det_idxs,az_angle_idx,el_angle_idx] = True
+
+
+
+        return self.beamformed_resp
