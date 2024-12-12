@@ -1,7 +1,7 @@
 from cpsl_datasets.cpsl_ds import CpslDS
 from mmwave_radar_processing.plotting.movie_generator import MovieGenerator
 from mmwave_radar_processing.plotting.plotter_synthetic_array_data import PlotterSyntheticArrayData
-from mmwave_radar_processing.processors.synthetic_array_processor import SyntheticArrayProcessor
+from mmwave_radar_processing.processors.synthetic_array_beamformer_processor import SyntheticArrayBeamformerProcessor
 import numpy as np
 
 class MovieGeneratorSyntheticArrayData(MovieGenerator):
@@ -10,7 +10,7 @@ class MovieGeneratorSyntheticArrayData(MovieGenerator):
             self,
             cpsl_dataset: CpslDS,
             plotter:PlotterSyntheticArrayData,
-            processor:SyntheticArrayProcessor,
+            processor:SyntheticArrayBeamformerProcessor,
             temp_dir_path="~/Downloads/odometry_temp") -> None:
 
         self.plotter:PlotterSyntheticArrayData = plotter

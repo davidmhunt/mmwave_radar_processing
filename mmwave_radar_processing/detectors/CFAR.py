@@ -158,26 +158,29 @@ class CaCFAR_2D:
     """
     def __init__(
             self,
-            num_guard_cells = 4,
-            num_training_cells = 10,
+            num_guard_cells:np.ndarray= np.array([5,5]),
+            num_training_cells:np.ndarray = np.array([10,10]),
             false_alarm_rate = .1,
-            resp_border_cells = 3,
+            resp_border_cells:np.ndarray = np.array([5,5]),
             mode="valid"
             ) -> None:
         
         #compute the window size
-        self.window_size = 2 * (num_training_cells + num_guard_cells) + 1
-        self.num_guard_cells = num_guard_cells
-        self.num_training_cells = num_training_cells
+        self.window_size = np.array([
+            2 * (num_training_cells[0] + num_guard_cells[0]) + 1,
+            2 * (num_training_cells[1] + num_guard_cells[1]) + 1
+        ])
+        self.num_guard_cells:np.array = num_guard_cells
+        self.num_training_cells:np.array = num_training_cells
 
         #create the window to convolve over
         self.window = np.zeros(
-            shape=(self.window_size,self.window_size),
+            shape=(self.window_size[0],self.window_size[1]),
             dtype=float)
-        self.window[:num_training_cells,:] = 1
-        self.window[-num_training_cells:,:] = 1
-        self.window[:,:num_training_cells] = 1
-        self.window[:,-num_training_cells:] = 1        
+        self.window[:num_training_cells[0],:] = 1
+        self.window[-num_training_cells[0]:,:] = 1
+        self.window[:,:num_training_cells[1]] = 1
+        self.window[:,-num_training_cells[1]:] = 1        
 
         #save the amount to clip the response by at the borders
         self.resp_border_cells = resp_border_cells
@@ -221,13 +224,16 @@ class CaCFAR_2D:
         #determine the size of the invalid region size based on 
         #the convolution mode
         if self.mode=="valid":
-            invalid_region_size = self.resp_border_cells + \
-                  self.num_training_cells + self.num_guard_cells
+            invalid_region_size = np.array([
+                self.resp_border_cells[0] + \
+                  self.num_training_cells[0] + self.num_guard_cells[0],
+                self.resp_border_cells[1] + \
+                  self.num_training_cells[1] + self.num_guard_cells[1]])
         elif self.mode=="full":
             invalid_region_size = self.resp_border_cells
         
-        self.row_valid_slice = slice(invalid_region_size,-invalid_region_size)
-        self.col_valid_slice = slice(invalid_region_size,-invalid_region_size)
+        self.row_valid_slice = slice(invalid_region_size[0],-invalid_region_size[0])
+        self.col_valid_slice = slice(invalid_region_size[1],-invalid_region_size[1])
 
 
 
@@ -252,8 +258,8 @@ class CaCFAR_2D:
 
         #clip the signal
         signal_clipped = signal[
-            self.resp_border_cells:-self.resp_border_cells,
-            self.resp_border_cells:-self.resp_border_cells]
+            self.resp_border_cells[0]:-self.resp_border_cells[0],
+            self.resp_border_cells[1]:-self.resp_border_cells[1]]
         
         #compute the noise for each cell
         P_n = (1/self.N) * convolve2d(
@@ -280,19 +286,18 @@ class CaCFAR_2D:
 
     def _compute_full_cfar(self,signal:np.ndarray):
         
-        #clip the signal
         signal_clipped = signal[
-            self.resp_border_cells:-self.resp_border_cells,
-            self.resp_border_cells:-self.resp_border_cells]
+            self.resp_border_cells[0]:-self.resp_border_cells[0],
+            self.resp_border_cells[1]:-self.resp_border_cells[1]]
         
         # Pad the signal 
         padded_signal = np.pad(
             signal_clipped,
             pad_width=(
-                (self.num_training_cells + self.num_guard_cells,
-                    self.num_training_cells + self.num_guard_cells),
-                (self.num_training_cells + self.num_guard_cells,
-                    self.num_training_cells + self.num_guard_cells)),
+                (self.num_training_cells[0] + self.num_guard_cells[0],
+                    self.num_training_cells[0] + self.num_guard_cells[0]),
+                (self.num_training_cells[1] + self.num_guard_cells[1],
+                    self.num_training_cells[1] + self.num_guard_cells[1])),
             mode='constant',
             constant_values=((0, 0),(0,0))
         )

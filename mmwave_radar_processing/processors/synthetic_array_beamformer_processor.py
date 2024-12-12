@@ -3,14 +3,14 @@ import scipy.constants as constants
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
-from mmwave_radar_processing.detectors.CFAR import CaCFAR_1D
+from mmwave_radar_processing.detectors.CFAR import CaCFAR_1D,CaCFAR_2D
 
-class SyntheticArrayProcessor(_Processor):
+class SyntheticArrayBeamformerProcessor(_Processor):
 
     def __init__(
             self,
             config_manager: ConfigManager,
-            cfar:CaCFAR_1D,
+            cfar:CaCFAR_2D,
             az_angle_bins_rad=\
                 np.deg2rad(np.linspace(
                     start=-30,stop=30,num=60
@@ -311,6 +311,21 @@ class SyntheticArrayProcessor(_Processor):
 
         #compute the response
         return np.fft.fft(beamformed_resp * window)
+    
+    def compute_2D_cfar_on_beamformed_resp(self)->np.ndarray:
+
+        #reset the CFAR detections
+        self.beamformed_dets = np.zeros(
+            shape=(self.range_bins.shape[0],
+                   self.az_angle_bins_rad.shape[0],
+                   self.el_angle_bins_rad.shape[0]),
+            dtype=bool
+        )
+
+        for el_angle_idx in range(self.el_angle_bins_rad.shape[0]):
+            resp = self.beamformed_resp[:,:,el_angle_idx]
+            self.beamformed_dets[:,:,el_angle_idx],T = \
+                self.cfar.compute(resp)
 
     def process(self,adc_cube:np.ndarray) -> np.ndarray:
         """Compute the beamformed synthetic response
@@ -325,14 +340,6 @@ class SyntheticArrayProcessor(_Processor):
         #reshpae the adc cube accordingly
         adc_cube_reshaped = np.transpose(adc_cube,axes=(1,0,2))
 
-        #reset the CFAR detector
-        self.beamformed_dets = np.zeros(
-            shape=(self.range_bins.shape[0],
-                   self.az_angle_bins_rad.shape[0],
-                   self.el_angle_bins_rad.shape[0]),
-            dtype=bool
-        )
-
         for az_angle_idx in range(self.az_angle_bins_rad.shape[0]):
             for el_angle_idx in range(self.el_angle_bins_rad.shape[0]):
 
@@ -344,13 +351,11 @@ class SyntheticArrayProcessor(_Processor):
                     steering_vector=steering_vector
                 )
 
-                #get the cfar detections
-                det_idxs,T = self.cfar.compute(resp)
-
                 #save the response and the cfar detections
                 self.beamformed_resp[:,az_angle_idx,el_angle_idx] = resp
-                self.beamformed_dets[det_idxs,az_angle_idx,el_angle_idx] = True
 
 
+        #compute the cfar on the beamformed response
+        self.compute_2D_cfar_on_beamformed_resp()
 
         return self.beamformed_resp

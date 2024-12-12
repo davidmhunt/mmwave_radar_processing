@@ -2,14 +2,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
-from mmwave_radar_processing.processors.synthetic_array_processor import SyntheticArrayProcessor
+from mmwave_radar_processing.processors.synthetic_array_beamformer_processor import SyntheticArrayBeamformerProcessor
 from mmwave_radar_processing.supportFns.rotation_functions import apply_rot_trans
+from mmwave_radar_processing.processors.strip_map_SAR_processor import StripMapSARProcessor
 
 class PlotterSyntheticArrayData:
 
     def __init__(self,
                  config_manager:ConfigManager,
-                 synthetic_array_processor:SyntheticArrayProcessor,
+                 processor_SABF:SyntheticArrayBeamformerProcessor,
+                 processor_stripMapSAR:StripMapSARProcessor=None,
                  min_vel = 0.4) -> None:
         
         #define default plot parameters:
@@ -27,8 +29,10 @@ class PlotterSyntheticArrayData:
         self.min_vel = min_vel
 
         #synthetic array processor
-        self.processor:SyntheticArrayProcessor =\
-            synthetic_array_processor
+        self.processor_SABF:SyntheticArrayBeamformerProcessor =\
+            processor_SABF
+        #[optional]
+        self.processor_stripMapSAR:StripMapSARProcessor = processor_stripMapSAR
     
     ####################################################################
     #Plotting the array geometry
@@ -42,18 +46,18 @@ class PlotterSyntheticArrayData:
     ):
 
         #compute the geometries
-        self.processor._generate_array_geometries(vels)
+        self.processor_SABF._generate_array_geometries(vels)
 
         if not ax:
             fig,ax = plt.subplots()
 
         x_coords = np.reshape(
-            self.processor.p_x_m,
+            self.processor_SABF.p_x_m,
             newshape=(-1,1),
             order='F'
         )
         z_coords = np.reshape(
-            self.processor.p_z_m,
+            self.processor_SABF.p_z_m,
             newshape=(-1,1),
             order='F'
         )
@@ -64,42 +68,42 @@ class PlotterSyntheticArrayData:
 
         title_str = "Synth Array: x vel ({:.2} m/s), {} chirps".format(
             vels[0],
-            self.processor.chirps_per_frame
+            self.processor_SABF.chirps_per_frame
         )
         ax.set_title(title_str,
                     fontsize=self.font_size_title)
         if vels[0] > 0:
             ax.set_xlim(
-                left=-1 * self.processor.lambda_m/8,
-                right=self.processor.p_x_m[0,5] + \
-                    self.processor.lambda_m/8
+                left=-1 * self.processor_SABF.lambda_m/8,
+                right=self.processor_SABF.p_x_m[0,5] + \
+                    self.processor_SABF.lambda_m/8
             )
             ax.set_xticks(
                 ticks=np.linspace(
-                    start=-1 * self.processor.lambda_m/8,
-                    stop=self.processor.p_x_m[0,5] + \
-                    self.processor.lambda_m/8,
+                    start=-1 * self.processor_SABF.lambda_m/8,
+                    stop=self.processor_SABF.p_x_m[0,5] + \
+                    self.processor_SABF.lambda_m/8,
                     num=3
                 )
             )
         else:
             ax.set_xlim(
-                right=1 * self.processor.lambda_m/8,
-                left=self.processor.p_x_m[0,5] - \
-                    self.processor.lambda_m/8
+                right=1 * self.processor_SABF.lambda_m/8,
+                left=self.processor_SABF.p_x_m[0,5] - \
+                    self.processor_SABF.lambda_m/8
             )
             ax.set_xticks(
                 ticks=np.linspace(
-                    start=1 * self.processor.lambda_m/8,
-                    stop=self.processor.p_x_m[0,5] - \
-                    self.processor.lambda_m/8,
+                    start=1 * self.processor_SABF.lambda_m/8,
+                    stop=self.processor_SABF.p_x_m[0,5] - \
+                    self.processor_SABF.lambda_m/8,
                     num=4
                 )
             )
         ax.set_ylim(
-            bottom=-1 * self.processor.lambda_m/8,
-            top = self.processor.p_z_m[-1,1] + \
-                self.processor.lambda_m/8
+            bottom=-1 * self.processor_SABF.lambda_m/8,
+            top = self.processor_SABF.p_z_m[-1,1] + \
+                self.processor_SABF.lambda_m/8
         )
 
         if show:
@@ -141,11 +145,11 @@ class PlotterSyntheticArrayData:
             resp = np.abs(resp)
         
         #identify the elevation bin closest to 0
-        diffs = np.abs(self.processor.el_angle_bins_rad)
+        diffs = np.abs(self.processor_SABF.el_angle_bins_rad)
         idx = np.argmin(diffs)
         
-        x_s = self.processor.x_s[:,:,idx]
-        y_s = self.processor.y_s[:,:,idx]
+        x_s = self.processor_SABF.x_s[:,:,idx]
+        y_s = self.processor_SABF.y_s[:,:,idx]
 
         resp = resp[:,:,idx]
         
@@ -199,11 +203,11 @@ class PlotterSyntheticArrayData:
             resp = np.abs(resp)
         
         #identify the elevation bin closest to 0
-        diffs = np.abs(self.processor.az_angle_bins_rad)
+        diffs = np.abs(self.processor_SABF.az_angle_bins_rad)
         idx = np.argmin(diffs)
         
-        y_s = self.processor.y_s[:,idx,:]
-        z_s = self.processor.z_s[:,idx,:]
+        y_s = self.processor_SABF.y_s[:,idx,:]
+        z_s = self.processor_SABF.z_s[:,idx,:]
 
         resp = resp[:,idx,:]
         
@@ -225,6 +229,60 @@ class PlotterSyntheticArrayData:
         if show:
             plt.show()
 
+    ####################################################################
+    #Plotting stripmap sar responses
+    #################################################################### 
+    def plot_stripmap_SAR_resp(
+            self,
+            resp:np.ndarray,
+            convert_to_dB=False,
+            cmap="viridis",
+            ax:plt.Axes=None,
+            show=False
+    ):
+        """Plot a stripMap SAR response (preliminary)
+
+        Args:
+            resp (np.ndarray): a 2D beamformed response indexed by 
+                [range bin, az angle (theta), el angle (phi)]
+            convert_to_dB (bool, optional): on True, converts the response to a 
+                log scale. Defaults to False.
+            cmap (str, optional): the color map used for the generated plot
+                (gray is another option). Defaults to "viridis".
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
+        if not ax:
+            fig,ax = plt.subplots()
+        
+        if convert_to_dB:
+            resp = 20 * np.log10(np.abs(resp))
+        else:
+            resp = np.abs(resp)
+        
+        x_s = self.processor_stripMapSAR.x_s
+        y_s = self.processor_stripMapSAR.y_s
+        
+        ax.pcolormesh(
+            x_s,
+            y_s,
+            resp,
+            shading='gouraud',
+            cmap=cmap
+        )
+        
+        ax.set_xlabel("X (m)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("Y (m)",fontsize=self.font_size_axis_labels)
+        if convert_to_dB:
+            ax.set_title("Strip-map SAR response (dB)",fontsize=self.font_size_title)
+        else:
+            ax.set_title("Strip-map SAR response (mag)",fontsize=self.font_size_title)
+
+        if show:
+            plt.show()
     ####################################################################
     #Plotting beamformed cfar detections
     ####################################################################
@@ -250,12 +308,12 @@ class PlotterSyntheticArrayData:
             fig,ax = plt.subplots()
         
         #identify the elevation bin closest to 0
-        diffs = np.abs(self.processor.el_angle_bins_rad)
+        diffs = np.abs(self.processor_SABF.el_angle_bins_rad)
         idx = np.argmin(diffs)
 
         dets = cfar_det_idxs[:,:,idx]
-        x_s = self.processor.x_s[:,:,idx]
-        y_s = self.processor.y_s[:,:,idx]
+        x_s = self.processor_SABF.x_s[:,:,idx]
+        y_s = self.processor_SABF.y_s[:,:,idx]
 
         x_coords = x_s[dets]
         y_coords = y_s[dets]
@@ -264,7 +322,14 @@ class PlotterSyntheticArrayData:
                     c=color,
                     s=5.0,
                     alpha=0.75)
-
+        ax.set_xlim(
+            left=np.min(self.processor_SABF.x_s),
+            right=np.max(self.processor_SABF.x_s)
+        )
+        ax.set_ylim(
+            bottom=0,
+            top=np.max(self.processor_SABF.y_s)
+        )
         ax.set_xlabel("X (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Y (m)",fontsize=self.font_size_axis_labels)
         ax.set_title("Az CFAR detections",fontsize=self.font_size_title)
@@ -284,7 +349,7 @@ class PlotterSyntheticArrayData:
 
         #convert the response to dB
         resp = 20 * np.log10(np.abs(resp))
-        dets = self.processor.beamformed_dets
+        dets = self.processor_SABF.beamformed_dets
         
         #filter out non-CFAR detections
         resp[~dets] = 0.0
@@ -293,10 +358,10 @@ class PlotterSyntheticArrayData:
         max_vals = np.max(resp,axis=0)
         max_idxs = np.argmax(resp,axis=0)
 
-        img = self.processor.range_bins[max_idxs]
+        img = self.processor_SABF.range_bins[max_idxs]
         max_val = np.max(max_vals)
         img[max_vals < (max_val - 40)] = \
-            self.processor.range_bins[-1]
+            self.processor_SABF.range_bins[-1]
 
         #transpose the image so that az and el are on the correct axes
         img = np.flip(img.transpose(),axis=0)
@@ -310,10 +375,10 @@ class PlotterSyntheticArrayData:
             cmap=cmap,
             interpolation='gaussian',
             extent=[
-                np.rad2deg(self.processor.az_angle_bins_rad[0]),
-                np.rad2deg(self.processor.az_angle_bins_rad[-1]),
-                np.rad2deg(self.processor.el_angle_bins_rad[0]),
-                np.rad2deg(self.processor.el_angle_bins_rad[-1])
+                np.rad2deg(self.processor_SABF.az_angle_bins_rad[0]),
+                np.rad2deg(self.processor_SABF.az_angle_bins_rad[-1]),
+                np.rad2deg(self.processor_SABF.el_angle_bins_rad[0]),
+                np.rad2deg(self.processor_SABF.el_angle_bins_rad[-1])
             ],
             aspect='auto'
         )
@@ -356,16 +421,24 @@ class PlotterSyntheticArrayData:
         )
 
         #filter only the points that should be able to be seen
-        valid_idxs = (lidar_pc_raw[:,0] > np.min(self.processor.x_s)) & \
-                    (lidar_pc_raw[:,0] < np.max(self.processor.x_s)) & \
-                    (lidar_pc_raw[:,1] > np.min(self.processor.y_s)) & \
-                    (lidar_pc_raw[:,1] < np.max(self.processor.y_s)) 
+        valid_idxs = (lidar_pc_raw[:,0] > np.min(self.processor_SABF.x_s)) & \
+                    (lidar_pc_raw[:,0] < np.max(self.processor_SABF.x_s)) & \
+                    (lidar_pc_raw[:,1] > np.min(self.processor_SABF.y_s)) & \
+                    (lidar_pc_raw[:,1] < np.max(self.processor_SABF.y_s)) 
         lidar_pc_raw = lidar_pc_raw[valid_idxs,:]
 
 
         ax.scatter(lidar_pc_raw[:,0],lidar_pc_raw[:,1],
                    c=color,alpha=0.75,
                    s=0.25)
+        ax.set_xlim(
+            left=np.min(self.processor_SABF.x_s),
+            right=np.max(self.processor_SABF.x_s)
+        )
+        ax.set_ylim(
+            bottom=0,
+            top=np.max(self.processor_SABF.y_s)
+        )
         ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
         ax.set_title("Lidar GT",fontsize=self.font_size_title)
@@ -407,11 +480,11 @@ class PlotterSyntheticArrayData:
         
         if np.linalg.norm(vels) > self.min_vel:
             #compute the response
-            resp = self.processor.process(
+            resp = self.processor_SABF.process(
                 adc_cube
             )
 
-            dets = self.processor.beamformed_dets
+            dets = self.processor_SABF.beamformed_dets
 
             #plot the az beamformed response
             self.plot_2D_az_beamformed_resp_slice(
@@ -436,6 +509,22 @@ class PlotterSyntheticArrayData:
                 resp=resp,
                 cmap="hot_r",
                 ax=axs[0,2],
+                show=False
+            )
+
+            #plot the StripMap SAR response if available
+            sar_resp = self.processor_stripMapSAR.process(
+                adc_cube=adc_cube,
+                vel_m_per_s=np.abs(vels)[0],
+                sensor_height_m=0.24,
+                rx_index=0,
+                max_SAR_distance=1.5
+            )
+            self.plot_stripmap_SAR_resp(
+                resp=sar_resp,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=axs[1,2],
                 show=False
             )
 
