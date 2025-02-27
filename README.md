@@ -69,7 +69,7 @@ curl -sSL https://install.python-poetry.org | python3 -
 Navigate to the mmwave_radar_processing foler (this folder) and execute the following command
 
 ```
-poetry install --with submodules
+poetry install --extras "submodules"
 ```
 
 If you get an an error saying: "Failed to unlock the collection!", execute the following command in the terminal:

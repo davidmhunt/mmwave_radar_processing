@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10, <3.13"
 numpy = "^1.25"
 scikit-learn = "^1.3.2"
 SciPy = "^1.11.4"
@@ -17,14 +17,17 @@ ipywidgets = "^8.1.1"
 jupyter = "^1.0.0"
 pytest = "^7.4.4"
 imageio = {extras = ["ffmpeg"], version = "^2.33.1"}
-open3d = "^0.18.0"
 addict = "^2.4.0"
 pandas = "^2.1.4"
 opencv-python = ">4.7, <4.9.0.80"
 poetry-dotenv-plugin = "^0.2.0"
 
-[tool.poetry.group.submodules.dependencies]
-cpsl_datasets = {path="./submodules/cpsl_datasets/", develop = true}
+#optional dependencies
+cpsl_datasets = {path="./submodules/cpsl_datasets/", develop = true, optional = true}
+
+[tool.poetry.extras]
+submodules = [
+    "cpsl_datasets"]
 
 [tool.poetry.group.dev.dependencies]
 ipywidgets = "^8.1.1"
