@@ -36,7 +36,7 @@ class RangeAzimuthProcessor(_Processor):
         self.range_bins = np.arange(
             start=0,
             step=self.config_manager.range_res_m,
-            stop=self.config_manager.range_max_m)
+            stop=self.config_manager.range_max_m - self.config_manager.range_res_m/2)
 
         #compute the phase shifts
         self.num_rx_antennas = self.config_manager.num_rx_antennas

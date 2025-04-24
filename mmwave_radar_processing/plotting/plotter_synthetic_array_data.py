@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
-from mmwave_radar_processing.processors.synthetic_array_beamformer_processor import SyntheticArrayBeamformerProcessor
+from mmwave_radar_processing.processors.synthetic_array_beamformer_processor_revA import SyntheticArrayBeamformerProcessor
 from mmwave_radar_processing.supportFns.rotation_functions import apply_rot_trans
 from mmwave_radar_processing.processors.strip_map_SAR_processor import StripMapSARProcessor
 
@@ -22,6 +22,7 @@ class PlotterSyntheticArrayData:
         self.plot_x_max = 10
         self.plot_y_max = 20
         self.marker_size = 10
+        self.min_threshold_dB = 40
 
         #configuration manager
         self.config_manager:ConfigManager = config_manager
@@ -44,9 +45,28 @@ class PlotterSyntheticArrayData:
         ax:plt.Axes=None,
         show=False
     ):
+        if self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.BROADSIDE_MODE:
+            self.plot_synthetic_array_geometry_broadside(
+                vels=vels,
+                ax=ax,
+                show=show
+            )
+        elif self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.ENDFIRE_MODE:
+            self.plot_synthetic_array_geometry_endfire(
+                vels=vels,
+                ax=ax,
+                show=show
+            )
+
+    def plot_synthetic_array_geometry_broadside(
+        self,
+        vels,
+        ax:plt.Axes=None,
+        show=False
+    ):
 
         #compute the geometries
-        self.processor_SABF._generate_array_geometries(vels)
+        self.processor_SABF.generate_array_geometries(vels)
 
         if not ax:
             fig,ax = plt.subplots()
@@ -109,6 +129,77 @@ class PlotterSyntheticArrayData:
         if show:
             plt.show()
 
+    def plot_synthetic_array_geometry_endfire(
+        self,
+        vels,
+        ax:plt.Axes=None,
+        show=False
+    ):
+
+        #compute the geometries
+        self.processor_SABF.generate_array_geometries(vels)
+
+        if not ax:
+            fig,ax = plt.subplots()
+
+        x_coords = np.reshape(
+            self.processor_SABF.p_x_m,
+            newshape=(-1,1),
+            order='F'
+        )
+        y_coords = np.reshape(
+            self.processor_SABF.p_y_m,
+            newshape=(-1,1),
+            order='F'
+        )
+
+        ax.scatter(y_coords,x_coords)
+        ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
+
+        title_str = "Synth Array: x vel ({:.2} m/s), {} chirps".format(
+            vels[0],
+            self.processor_SABF.chirps_per_frame
+        )
+        ax.set_title(title_str,
+                    fontsize=self.font_size_title)
+        if vels[0] > 0:
+            ax.set_ylim(
+                bottom=-1 * self.processor_SABF.lambda_m/8,
+                top=self.processor_SABF.p_x_m[0,5] + \
+                    self.processor_SABF.lambda_m/8
+            )
+            ax.set_yticks(
+                ticks=np.linspace(
+                    start=-1 * self.processor_SABF.lambda_m/8,
+                    stop=self.processor_SABF.p_x_m[0,5] + \
+                    self.processor_SABF.lambda_m/8,
+                    num=3
+                )
+            )
+        else:
+            ax.set_ylim(
+                bottom=1 * self.processor_SABF.lambda_m/8,
+                top=self.processor_SABF.p_x_m[0,5] - \
+                    self.processor_SABF.lambda_m/8
+            )
+            ax.set_yticks(
+                ticks=np.linspace(
+                    start=1 * self.processor_SABF.lambda_m/8,
+                    stop=self.processor_SABF.p_x_m[0,5] - \
+                    self.processor_SABF.lambda_m/8,
+                    num=4
+                )
+            )
+        ax.set_xlim(
+            right=-1 * self.processor_SABF.lambda_m/8,
+            left = self.processor_SABF.p_y_m[-1,1] + \
+                self.processor_SABF.lambda_m/8
+        )
+
+        if show:
+            plt.show()
+
     ####################################################################
     #Plotting beamformed response
     #################################################################### 
@@ -136,11 +227,55 @@ class PlotterSyntheticArrayData:
             show (bool, optional): On true, shows the plot. Defaults to False.
         """
 
+        if self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.BROADSIDE_MODE:
+            self.plot_2D_az_beamformed_resp_slice_broadside(
+                resp=resp,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=ax,
+                show=show
+            )
+        elif self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.ENDFIRE_MODE:
+            self.plot_2D_az_beamformed_resp_slice_endfire(
+                resp=resp,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=ax,
+                show=show
+            )
+    
+    def plot_2D_az_beamformed_resp_slice_broadside(
+            self,
+            resp:np.ndarray,
+            convert_to_dB=False,
+            cmap="viridis",
+            ax:plt.Axes=None,
+            show=False
+    ):
+        """Plot a 2D slice of the azimuth beamformed response at 0-deg elevation
+
+        Args:
+            resp (np.ndarray): a 2D beamformed response indexed by 
+                [range bin, az angle (theta), el angle (phi)]
+            convert_to_dB (bool, optional): on True, converts the response to a 
+                log scale. Defaults to False.
+            cmap (str, optional): the color map used for the generated plot
+                (gray is another option). Defaults to "viridis".
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
         if not ax:
             fig,ax = plt.subplots()
         
         if convert_to_dB:
             resp = 20 * np.log10(np.abs(resp))
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
         else:
             resp = np.abs(resp)
         
@@ -163,6 +298,69 @@ class PlotterSyntheticArrayData:
         
         ax.set_xlabel("X (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Y (m)",fontsize=self.font_size_axis_labels)
+        if convert_to_dB:
+            ax.set_title("Az Beamformed response (dB)",fontsize=self.font_size_title)
+        else:
+            ax.set_title("Az Beamformed response (mag)",fontsize=self.font_size_title)
+
+        if show:
+            plt.show()
+    
+    def plot_2D_az_beamformed_resp_slice_endfire(
+            self,
+            resp:np.ndarray,
+            convert_to_dB=False,
+            cmap="viridis",
+            ax:plt.Axes=None,
+            show=False
+    ):
+        """Plot a 2D slice of the azimuth beamformed response at 0-deg elevation
+
+        Args:
+            resp (np.ndarray): a 2D beamformed response indexed by 
+                [range bin, az angle (theta), el angle (phi)]
+            convert_to_dB (bool, optional): on True, converts the response to a 
+                log scale. Defaults to False.
+            cmap (str, optional): the color map used for the generated plot
+                (gray is another option). Defaults to "viridis".
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
+        if not ax:
+            fig,ax = plt.subplots()
+        
+        if convert_to_dB:
+            resp = 20 * np.log10(np.abs(resp))
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
+        else:
+            resp = np.abs(resp)
+        
+        #identify the elevation bin closest to 0
+        diffs = np.abs(self.processor_SABF.el_angle_bins_rad)
+        idx = np.argmin(diffs)
+        
+        x_s = self.processor_SABF.x_s[:,:,idx]
+        y_s = self.processor_SABF.y_s[:,:,idx]
+
+        resp = resp[:,:,idx]
+        
+        ax.pcolormesh(
+            y_s,
+            x_s,
+            resp,
+            shading='gouraud',
+            cmap=cmap
+        )
+        
+        ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
+        ax.invert_xaxis()
         if convert_to_dB:
             ax.set_title("Az Beamformed response (dB)",fontsize=self.font_size_title)
         else:
@@ -194,11 +392,55 @@ class PlotterSyntheticArrayData:
             show (bool, optional): On true, shows the plot. Defaults to False.
         """
 
+        if self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.BROADSIDE_MODE:
+            self.plot_2D_el_beamformed_resp_slice_broadside(
+                resp=resp,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=ax,
+                show=show
+            )
+        if self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.ENDFIRE_MODE:
+            self.plot_2D_el_beamformed_resp_slice_endfire(
+                resp=resp,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=ax,
+                show=show
+            )
+
+    def plot_2D_el_beamformed_resp_slice_broadside(
+            self,
+            resp:np.ndarray,
+            convert_to_dB=False,
+            cmap="viridis",
+            ax:plt.Axes=None,
+            show=False
+    ):
+        """Plot a 2D slice of the elevation beamformed response at 0-deg az
+
+        Args:
+            resp (np.ndarray): a 2D beamformed response indexed by 
+                [range bin, az angle (theta), el angle (phi)]
+            convert_to_dB (bool, optional): on True, converts the response to a 
+                log scale. Defaults to False.
+            cmap (str, optional): the color map used for the generated plot
+                (gray is another option). Defaults to "viridis".
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
         if not ax:
             fig,ax = plt.subplots()
         
         if convert_to_dB:
             resp = 20 * np.log10(np.abs(resp))
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
         else:
             resp = np.abs(resp)
         
@@ -220,6 +462,68 @@ class PlotterSyntheticArrayData:
         )
         
         ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("Z (m)",fontsize=self.font_size_axis_labels)
+        if convert_to_dB:
+            ax.set_title("El Beamformed response (dB)",fontsize=self.font_size_title)
+        else:
+            ax.set_title("El Beamformed response (mag)",fontsize=self.font_size_title)
+
+        if show:
+            plt.show()
+    
+    def plot_2D_el_beamformed_resp_slice_endfire(
+            self,
+            resp:np.ndarray,
+            convert_to_dB=False,
+            cmap="viridis",
+            ax:plt.Axes=None,
+            show=False
+    ):
+        """Plot a 2D slice of the elevation beamformed response at 0-deg az
+
+        Args:
+            resp (np.ndarray): a 2D beamformed response indexed by 
+                [range bin, az angle (theta), el angle (phi)]
+            convert_to_dB (bool, optional): on True, converts the response to a 
+                log scale. Defaults to False.
+            cmap (str, optional): the color map used for the generated plot
+                (gray is another option). Defaults to "viridis".
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
+        if not ax:
+            fig,ax = plt.subplots()
+        
+        if convert_to_dB:
+            resp = 20 * np.log10(np.abs(resp))
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
+        else:
+            resp = np.abs(resp)
+        
+        #identify the elevation bin closest to 0
+        diffs = np.abs(self.processor_SABF.az_angle_bins_rad)
+        idx = np.argmin(diffs)
+        
+        x_s = self.processor_SABF.x_s[:,idx,:]
+        z_s = self.processor_SABF.z_s[:,idx,:]
+
+        resp = resp[:,idx,:]
+        
+        img = ax.pcolormesh(
+            x_s,
+            z_s,
+            resp,
+            shading='gouraud',
+            cmap=cmap
+        )
+        
+        ax.set_xlabel("X (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Z (m)",fontsize=self.font_size_axis_labels)
         if convert_to_dB:
             ax.set_title("El Beamformed response (dB)",fontsize=self.font_size_title)
@@ -260,6 +564,10 @@ class PlotterSyntheticArrayData:
         
         if convert_to_dB:
             resp = 20 * np.log10(np.abs(resp))
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
         else:
             resp = np.abs(resp)
         
@@ -287,6 +595,39 @@ class PlotterSyntheticArrayData:
     #Plotting beamformed cfar detections
     ####################################################################
     def plot_2D_az_beamformed_dets_slice(
+            self,
+            cfar_det_idxs:np.ndarray,
+            ax:plt.Axes=None,
+            color="red",
+            show=False
+    ):
+        """Plot a 2D slice of the azimuth beamformed response at 0-deg elevation
+
+        Args:
+            cfar_det_idxs (np.ndarray): a 2D beamformed detection array indexed by 
+                [range bin, az angle (theta), el angle (phi)]
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
+        if self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.BROADSIDE_MODE:
+            self.plot_2D_az_beamformed_dets_slice_broadside(
+                cfar_det_idxs=cfar_det_idxs,
+                ax=ax,
+                color = color,
+                show=show
+            )
+        elif self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.ENDFIRE_MODE:
+            self.plot_2D_az_beamformed_dets_slice_endfire(
+                cfar_det_idxs=cfar_det_idxs,
+                ax=ax,
+                color = color,
+                show=show
+            )
+
+    def plot_2D_az_beamformed_dets_slice_broadside(
             self,
             cfar_det_idxs:np.ndarray,
             ax:plt.Axes=None,
@@ -332,6 +673,57 @@ class PlotterSyntheticArrayData:
         )
         ax.set_xlabel("X (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_title("Az CFAR detections",fontsize=self.font_size_title)
+
+        if show:
+            plt.show()
+
+    def plot_2D_az_beamformed_dets_slice_endfire(
+            self,
+            cfar_det_idxs:np.ndarray,
+            ax:plt.Axes=None,
+            color="red",
+            show=False
+    ):
+        """Plot a 2D slice of the azimuth beamformed response at 0-deg elevation
+
+        Args:
+            cfar_det_idxs (np.ndarray): a 2D beamformed detection array indexed by 
+                [range bin, az angle (theta), el angle (phi)]
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
+        if not ax:
+            fig,ax = plt.subplots()
+        
+        #identify the elevation bin closest to 0
+        diffs = np.abs(self.processor_SABF.el_angle_bins_rad)
+        idx = np.argmin(diffs)
+
+        dets = cfar_det_idxs[:,:,idx]
+        x_s = self.processor_SABF.x_s[:,:,idx]
+        y_s = self.processor_SABF.y_s[:,:,idx]
+
+        x_coords = x_s[dets]
+        y_coords = y_s[dets]
+
+        ax.scatter(y_coords,x_coords,
+                    c=color,
+                    s=5.0,
+                    alpha=0.75)
+        ax.set_ylim(
+            bottom=0,
+            top=np.max(self.processor_SABF.x_s)
+        )
+        ax.set_xlim(
+            right=np.min(self.processor_SABF.y_s),
+            left=np.max(self.processor_SABF.y_s)
+        )
+        ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
         ax.set_title("Az CFAR detections",fontsize=self.font_size_title)
 
         if show:
@@ -404,13 +796,38 @@ class PlotterSyntheticArrayData:
         ax:plt.Axes=None,
         show=False
     ):
+        if self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.BROADSIDE_MODE:
+            self.plot_visible_lidar_pc_broadside(
+                lidar_pc_raw=lidar_pc_raw,
+                lidar_radar_offset_rad=lidar_radar_offset_rad,
+                color=color,
+                ax=ax,
+                show=show
+            )
+        elif self.processor_SABF.mode == SyntheticArrayBeamformerProcessor.ENDFIRE_MODE:
+            self.plot_visible_lidar_pc_endfire(
+                lidar_pc_raw=lidar_pc_raw,
+                lidar_radar_offset_rad=lidar_radar_offset_rad,
+                color=color,
+                ax=ax,
+                show=show
+            )
+    
+    def plot_visible_lidar_pc_broadside(
+        self,
+        lidar_pc_raw:np.ndarray,
+        lidar_radar_offset_rad:float=np.deg2rad(180),
+        color="red",
+        ax:plt.Axes=None,
+        show=False
+    ):
 
         if not ax:
             fig,ax = plt.subplots()
         
         #filter out the ground detections
         valid_idxs = (lidar_pc_raw[:,2] > 0.0) & \
-                    (lidar_pc_raw[:,2] < 2)
+                    (lidar_pc_raw[:,2] < 2.0)
         lidar_pc_raw = lidar_pc_raw[valid_idxs,0:2]
 
         #rotate the lidar pc into the radar's frame of view
@@ -420,7 +837,7 @@ class PlotterSyntheticArrayData:
             trans=np.array([0,0])
         )
 
-        #filter only the points that should be able to be seen
+        # filter only the points that should be able to be seen
         valid_idxs = (lidar_pc_raw[:,0] > np.min(self.processor_SABF.x_s)) & \
                     (lidar_pc_raw[:,0] < np.max(self.processor_SABF.x_s)) & \
                     (lidar_pc_raw[:,1] > np.min(self.processor_SABF.y_s)) & \
@@ -438,6 +855,56 @@ class PlotterSyntheticArrayData:
         ax.set_ylim(
             bottom=0,
             top=np.max(self.processor_SABF.y_s)
+        )
+        ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
+        ax.set_title("Lidar GT",fontsize=self.font_size_title)
+
+        if show:
+            plt.show()
+
+    def plot_visible_lidar_pc_endfire(
+        self,
+        lidar_pc_raw:np.ndarray,
+        lidar_radar_offset_rad:float=np.deg2rad(180),
+        color="red",
+        ax:plt.Axes=None,
+        show=False
+    ):
+
+        if not ax:
+            fig,ax = plt.subplots()
+        
+        #filter out the ground detections
+        valid_idxs = (lidar_pc_raw[:,2] > 0.2) & \
+                    (lidar_pc_raw[:,2] < 1.0)
+        lidar_pc_raw = lidar_pc_raw[valid_idxs,0:2]
+
+        #rotate the lidar pc into the radar's frame of view
+        lidar_pc_raw = apply_rot_trans(
+            lidar_pc_raw,
+            rot_angle_rad=lidar_radar_offset_rad,
+            trans=np.array([0,0])
+        )
+
+        # filter only the points that should be able to be seen
+        valid_idxs = (lidar_pc_raw[:,1] > np.min(self.processor_SABF.x_s)) & \
+                    (lidar_pc_raw[:,1] < np.max(self.processor_SABF.x_s)) & \
+                    (lidar_pc_raw[:,0] > np.min(self.processor_SABF.y_s)) & \
+                    (lidar_pc_raw[:,0] < np.max(self.processor_SABF.y_s)) 
+        lidar_pc_raw = lidar_pc_raw[valid_idxs,:]
+
+
+        ax.scatter(-1 * lidar_pc_raw[:,0],lidar_pc_raw[:,1],
+                   c=color,alpha=0.75,
+                   s=0.25)
+        ax.set_xlim(
+            right=np.min(self.processor_SABF.y_s),
+            left=np.max(self.processor_SABF.y_s)
+        )
+        ax.set_ylim(
+            bottom=0,
+            top=np.max(self.processor_SABF.x_s)
         )
         ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
@@ -504,81 +971,82 @@ class PlotterSyntheticArrayData:
                 show=False
             )
 
-            #plot the depth map
-            self.plot_3D_radar_depth_map_spherical(
-                resp=resp,
-                cmap="hot_r",
-                ax=axs[0,2],
-                show=False
-            )
+            # #plot the depth map
+            # self.plot_3D_radar_depth_map_spherical(
+            #     resp=resp,
+            #     cmap="hot_r",
+            #     ax=axs[0,2],
+            #     show=False
+            # )
 
-            #plot the StripMap SAR response if available
-            sar_resp = self.processor_stripMapSAR.process(
-                adc_cube=adc_cube,
-                vel_m_per_s=np.abs(vels)[0],
-                sensor_height_m=0.24,
-                rx_index=0,
-                max_SAR_distance=1.5
-            )
-            self.plot_stripmap_SAR_resp(
-                resp=sar_resp,
-                convert_to_dB=convert_to_dB,
-                cmap=cmap,
-                ax=axs[1,2],
-                show=False
-            )
+            # plot the StripMap SAR response if available
+            if self.processor_stripMapSAR:
+                sar_resp = self.processor_stripMapSAR.process(
+                    adc_cube=adc_cube,
+                    vel_m_per_s=np.abs(vels)[0],
+                    sensor_height_m=0.24,
+                    rx_index=0,
+                    max_SAR_distance=1.5
+                )
+                self.plot_stripmap_SAR_resp(
+                    resp=sar_resp,
+                    convert_to_dB=convert_to_dB,
+                    cmap=cmap,
+                    ax=axs[1,2],
+                    show=False
+                )
 
             #plot the CFAR detections
-            #plot the az beamformed response
-            self.plot_2D_az_beamformed_resp_slice(
-                resp=resp,
-                convert_to_dB=convert_to_dB,
-                cmap=cmap,
-                ax=axs[2,0],
-                show=False
-            )
+            # plot the az beamformed response
+            # self.plot_2D_az_beamformed_resp_slice(
+            #     resp=resp,
+            #     convert_to_dB=convert_to_dB,
+            #     cmap=cmap,
+            #     ax=axs[2,0],
+            #     show=False
+            # )
 
-            self.plot_2D_az_beamformed_dets_slice(
-                cfar_det_idxs=dets,
-                ax=axs[2,0],
-                show=False
-            )
+            # self.plot_2D_az_beamformed_dets_slice(
+            #     cfar_det_idxs=dets,
+            #     ax=axs[2,0],
+            #     show=False
+            # )
 
-            #plot the lidar data
+            # #plot the lidar data
             if lidar_pc_raw.shape[0] > 0:
 
                 self.plot_2D_az_beamformed_resp_slice(
                     resp=resp,
                     convert_to_dB=convert_to_dB,
                     cmap=cmap,
-                    ax=axs[2,1],
+                    ax=axs[1,0],
                     show=False
                 )
                 
                 self.plot_visible_lidar_pc(
                     lidar_pc_raw=lidar_pc_raw,
                     lidar_radar_offset_rad=lidar_radar_offset_rad,
-                    ax=axs[2,1],
+                    ax=axs[1,0],
                     color="red",
                     show=False
                 )
-                axs[2,0].set_title("Radar vs Lidar GT")
+                axs[1,0].set_title("Radar vs Lidar GT")
 
-            #plot CFAR detections vs lidar point cloud
-                self.plot_2D_az_beamformed_dets_slice(
-                    cfar_det_idxs=dets,
-                    ax=axs[2,2],
-                    color="blue",
-                    show=False
-                )
-                self.plot_visible_lidar_pc(
-                    lidar_pc_raw=lidar_pc_raw,
-                    lidar_radar_offset_rad=lidar_radar_offset_rad,
-                    ax=axs[2,2],
-                    color="red",
-                    show=False
-                )
-                axs[2,2].set_title("CFAR vs Lidar GT")
+            # #plot CFAR detections vs lidar point cloud
+            #     self.plot_2D_az_beamformed_dets_slice(
+            #         cfar_det_idxs=dets,
+            #         ax=axs[2,2],
+            #         color="blue",
+            #         show=False
+            #     )
+            #     self.plot_visible_lidar_pc(
+            #         lidar_pc_raw=lidar_pc_raw,
+            #         lidar_radar_offset_rad=lidar_radar_offset_rad,
+            #         ax=axs[2,2],
+            #         color="red",
+            #         show=False
+            #     )
+            #     axs[2,2].set_title("CFAR vs Lidar GT")
 
         if show:
             plt.show()

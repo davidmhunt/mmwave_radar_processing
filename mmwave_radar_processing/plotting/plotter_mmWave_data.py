@@ -17,6 +17,7 @@ class PlotterMmWaveData:
         self.plot_x_max = 10
         self.plot_y_max = 20
         self.marker_size = 10
+        self.min_threshold_dB = 40
 
         #configuration manager
         self.config_manager:ConfigManager = config_manager
@@ -56,6 +57,10 @@ class PlotterMmWaveData:
         
         if convert_to_dB:
             resp = 20 * np.log10(resp)
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
         
         #rotate the x and y grids so that the x axis is on the y axis
         x_grid = -1 * range_azimuth_processor.y_s
@@ -113,6 +118,10 @@ class PlotterMmWaveData:
         
         if convert_to_dB:
             resp = 20 * np.log10(resp)
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
         
         ax.imshow(
             np.flip(resp,axis=0),
@@ -172,6 +181,10 @@ class PlotterMmWaveData:
         
         if convert_to_dB:
             resp = 20 * np.log10(resp)
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
         
         im = ax.imshow(
             np.flip(resp,axis=0),

@@ -21,6 +21,7 @@ addict = "^2.4.0"
 pandas = "^2.1.4"
 opencv-python = ">4.7, <4.9.0.80"
 poetry-dotenv-plugin = "^0.2.0"
+plotly = "^6.0.1"
 
 [tool.poetry.group.submodules.dependencies]
 cpsl_datasets = {path="./submodules/cpsl_datasets/", develop = true}
