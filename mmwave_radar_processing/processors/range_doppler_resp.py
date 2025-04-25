@@ -31,7 +31,7 @@ class RangeDopplerProcessor(_Processor):
         self.range_bins = np.arange(
             start=0,
             step=self.config_manager.range_res_m,
-            stop=self.config_manager.range_max_m)
+            stop=self.config_manager.range_max_m - self.config_manager.range_res_m/2)
 
     def process(self, adc_cube: np.ndarray, rx_idx = 0) -> np.ndarray:
 

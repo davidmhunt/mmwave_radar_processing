@@ -24,7 +24,7 @@ class _Processor:
         """Function implemented by child class to process an ADC cube to obtain a desired response
 
         Args:
-            adc_cube (np.ndarray): (num tx antennas) x (num adc samples) x (num chirps) ADC cube corresponding to
+            adc_cube (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps) ADC cube corresponding to
                 a specific frame a radar data
 
         Returns:

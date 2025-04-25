@@ -223,11 +223,11 @@ class ConfigManager:
     
     def _load_channelCfg_from_cfg(self, params: list):
         
-        #determine the number of Tx antennas enabled
+        #determine the number of Rx antennas enabled
         self.channelCfg_rx_chan_enabled = int(params[1])
         self.num_rx_antennas = bin(self.channelCfg_rx_chan_enabled).count('1')
 
-        #determine the number of Rx antennas enabled
+        #determine the number of Tx antennas enabled
         self.channelCfg_tx_chan_enabled = int(params[2])
         self.num_tx_antennas = bin(self.channelCfg_tx_chan_enabled).count('1')
 

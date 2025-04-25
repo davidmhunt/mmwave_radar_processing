@@ -19,12 +19,6 @@ class RangeAzimuthProcessor(_Processor):
         self.num_range_bins:int = None
         self.range_bins:np.ndarray = None
 
-        #mesh grids for polar and cartesian plotting
-        self.thetas:np.ndarray = None
-        self.rhos:np.ndarray = None
-        self.x_s:np.ndarray = None
-        self.y_s:np.ndarray = None
-
         #load the configuration and configure the response 
         super().__init__(config_manager)
 
@@ -36,7 +30,7 @@ class RangeAzimuthProcessor(_Processor):
         self.range_bins = np.arange(
             start=0,
             step=self.config_manager.range_res_m,
-            stop=self.config_manager.range_max_m)
+            stop=self.config_manager.range_max_m - self.config_manager.range_res_m/2)
 
         #compute the phase shifts
         self.num_rx_antennas = self.config_manager.num_rx_antennas
