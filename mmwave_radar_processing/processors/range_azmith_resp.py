@@ -19,12 +19,6 @@ class RangeAzimuthProcessor(_Processor):
         self.num_range_bins:int = None
         self.range_bins:np.ndarray = None
 
-        #mesh grids for polar and cartesian plotting
-        self.thetas:np.ndarray = None
-        self.rhos:np.ndarray = None
-        self.x_s:np.ndarray = None
-        self.y_s:np.ndarray = None
-
         #load the configuration and configure the response 
         super().__init__(config_manager)
 

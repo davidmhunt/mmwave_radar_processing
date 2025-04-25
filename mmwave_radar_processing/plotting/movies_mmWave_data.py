@@ -2,6 +2,7 @@ from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from cpsl_datasets.cpsl_ds import CpslDS
 from mmwave_radar_processing.processors.range_azmith_resp import RangeAzimuthProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
+from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
 from mmwave_radar_processing.processors.virtual_array_reformater import VirtualArrayReformatter
 from mmwave_radar_processing.plotting.plotter_mmWave_data import PlotterMmWaveData
 from mmwave_radar_processing.plotting.movie_generator import MovieGenerator
@@ -13,6 +14,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
                  plotter:PlotterMmWaveData,
                  range_azimuth_processor:RangeAzimuthProcessor,
                  range_doppler_processor:RangeDopplerProcessor,
+                 doppler_azimuth_processor:DopplerAzimuthProcessor,
                  virtual_array_reformatter:VirtualArrayReformatter,
                  temp_dir_path="~/Downloads/odometry_temp",
                  ) -> None:
@@ -20,6 +22,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
         self.plotter:PlotterMmWaveData = plotter
         self.range_azimuth_processor:RangeAzimuthProcessor = range_azimuth_processor
         self.range_doppler_processor:RangeDopplerProcessor = range_doppler_processor
+        self.doppler_azimuth_processor:DopplerAzimuthProcessor = doppler_azimuth_processor
         self.virtual_array_reformatter = virtual_array_reformatter
         
         super().__init__(
@@ -57,6 +60,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
             adc_cube=adc_cube,
             range_doppler_processor=self.range_doppler_processor,
             range_azimuth_processor=self.range_azimuth_processor,
+            doppler_azimuth_processor=self.doppler_azimuth_processor,
             convert_to_dB=convert_to_dB,
             cmap=cmap,
             chirp_idx=chirp_idx,
