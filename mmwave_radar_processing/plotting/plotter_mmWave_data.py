@@ -336,6 +336,7 @@ class PlotterMmWaveData:
             range_doppler_processor:RangeDopplerProcessor,
             range_azimuth_processor:RangeAzimuthProcessor,
             doppler_azimuth_processor:DopplerAzimuthProcessor,
+            camera_view:np.ndarray=np.empty(shape=(0)),
             convert_to_dB=False,
             cmap="viridis",
             chirp_idx:int=0,
@@ -403,6 +404,11 @@ class PlotterMmWaveData:
             ax=axs[0,2],
             show=False
         )
+        #camera view
+        if camera_view.shape[0] > 0:
+            axs[1,2].imshow(camera_view)
+            axs[1,2].set_title("Frontal Camera View",fontsize=self.font_size_title)
+        
 
         if show:
             plt.show()

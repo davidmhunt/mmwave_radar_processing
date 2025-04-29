@@ -6,6 +6,7 @@ from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimu
 from mmwave_radar_processing.processors.virtual_array_reformater import VirtualArrayReformatter
 from mmwave_radar_processing.plotting.plotter_mmWave_data import PlotterMmWaveData
 from mmwave_radar_processing.plotting.movie_generator import MovieGenerator
+import numpy as np
 
 class MovieGeneratorMmWaveData(MovieGenerator):
 
@@ -55,12 +56,18 @@ class MovieGeneratorMmWaveData(MovieGenerator):
         ##reformat it with virtual arrays
         adc_cube = self.virtual_array_reformatter.process(adc_cube)
         
+        try:
+            camera_view = self.dataset.get_camera_frame(idx)
+        except AssertionError:
+            camera_view = np.empty(shape=(0))
+
         #generate the figure
         self.plotter.plot_compilation(
             adc_cube=adc_cube,
             range_doppler_processor=self.range_doppler_processor,
             range_azimuth_processor=self.range_azimuth_processor,
             doppler_azimuth_processor=self.doppler_azimuth_processor,
+            camera_view=camera_view,
             convert_to_dB=convert_to_dB,
             cmap=cmap,
             chirp_idx=chirp_idx,

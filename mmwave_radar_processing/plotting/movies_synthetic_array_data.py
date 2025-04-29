@@ -21,11 +21,15 @@ class MovieGeneratorSyntheticArrayData(MovieGenerator):
     def generate_movie_frame(self, idx, **kwargs):
 
         #get the velocity of the vehicle
-        vel = np.mean(self.dataset.get_vehicle_vel_data(idx)[:,1])
+        try: #try accessing the full odometry data
+            vel_data = np.mean(self.dataset.get_vehicle_odom_data(idx)[:,8:11],axis=0)
+        except AssertionError: #if not just get the x velocity (forward)
+            vel = np.mean(self.dataset.get_vehicle_vel_data(idx)[:,1])
+            vel_data = np.array([vel,0,0])
 
         #generate the array geometry
         self.processor.generate_array_geometries(
-            vels=np.array([-vel,0,0])
+            vels=vel_data
         )
         #get the adc cube
         adc_cube = self.dataset.get_radar_data(idx)
@@ -44,7 +48,7 @@ class MovieGeneratorSyntheticArrayData(MovieGenerator):
 
         self.plotter.plot_compilation(
             adc_cube=adc_cube,
-            vels=np.array([vel,0,0]),
+            vels=vel_data,
             camera_view=camera_view,
             lidar_pc_raw=lidar_pc_raw,
             show=False,

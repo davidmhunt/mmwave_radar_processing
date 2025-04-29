@@ -86,8 +86,13 @@ class PlotterSyntheticArrayData:
         ax.set_xlabel("X (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Z (m)",fontsize=self.font_size_axis_labels)
 
-        title_str = "Synth Array: x vel ({:.2} m/s), {} chirps".format(
-            vels[0],
+        formatted_vels = np.array2string(
+            vels,
+            formatter={'float_kind': lambda x: f"{x:.2f}"},
+            separator=', '
+        )
+        title_str = "Synth Array: vel ({} m/s)\n, {} chirps".format(
+            formatted_vels,
             self.processor_SABF.chirps_per_frame
         )
         ax.set_title(title_str,
@@ -157,8 +162,13 @@ class PlotterSyntheticArrayData:
         ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
 
-        title_str = "Synth Array: x vel ({:.2} m/s), {} chirps".format(
-            vels[0],
+        formatted_vels = np.array2string(
+            vels,
+            formatter={'float_kind': lambda x: f"{x:.2f}"},
+            separator=', '
+        )
+        title_str = "Synth Array: vel ({} m/s)\n, {} chirps".format(
+            formatted_vels,
             self.processor_SABF.chirps_per_frame
         )
         ax.set_title(title_str,
@@ -942,8 +952,8 @@ class PlotterSyntheticArrayData:
 
         #plot the camera view
         if camera_view.shape[0] > 0:
-            axs[1,0].imshow(camera_view)
-            axs[1,0].set_title("Frontal View",fontsize=self.font_size_title)
+            axs[0,2].imshow(camera_view)
+            axs[0,2].set_title("Frontal Camera View",fontsize=self.font_size_title)
         
         if np.linalg.norm(vels) > self.min_vel:
             #compute the response
