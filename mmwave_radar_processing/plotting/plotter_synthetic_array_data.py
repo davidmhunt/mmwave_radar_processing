@@ -71,18 +71,56 @@ class PlotterSyntheticArrayData:
         if not ax:
             fig,ax = plt.subplots()
 
-        x_coords = np.reshape(
-            self.processor_SABF.p_x_m,
-            newshape=(-1,1),
-            order='F'
-        )
-        z_coords = np.reshape(
-            self.processor_SABF.p_z_m,
-            newshape=(-1,1),
-            order='F'
-        )
+        #only plot if array geometry is valid
+        if self.processor_SABF.array_geometry_valid:
 
-        ax.scatter(x_coords,z_coords)
+            x_coords = np.reshape(
+                self.processor_SABF.p_x_m,
+                newshape=(-1,1),
+                order='F'
+            )
+            z_coords = np.reshape(
+                self.processor_SABF.p_z_m,
+                newshape=(-1,1),
+                order='F'
+            )
+
+            ax.scatter(x_coords,z_coords)
+            
+            if vels[0] > 0:
+                ax.set_xlim(
+                    left=-1 * self.processor_SABF.lambda_m/8,
+                    right=self.processor_SABF.p_x_m[0,5] + \
+                        self.processor_SABF.lambda_m/8
+                )
+                ax.set_xticks(
+                    ticks=np.linspace(
+                        start=-1 * self.processor_SABF.lambda_m/8,
+                        stop=self.processor_SABF.p_x_m[0,5] + \
+                        self.processor_SABF.lambda_m/8,
+                        num=3
+                    )
+                )
+            else:
+                ax.set_xlim(
+                    right=1 * self.processor_SABF.lambda_m/8,
+                    left=self.processor_SABF.p_x_m[0,5] - \
+                        self.processor_SABF.lambda_m/8
+                )
+                ax.set_xticks(
+                    ticks=np.linspace(
+                        start=1 * self.processor_SABF.lambda_m/8,
+                        stop=self.processor_SABF.p_x_m[0,5] - \
+                        self.processor_SABF.lambda_m/8,
+                        num=4
+                    )
+                )
+            ax.set_ylim(
+                bottom=-1 * self.processor_SABF.lambda_m/8,
+                top = self.processor_SABF.p_z_m[-1,1] + \
+                    self.processor_SABF.lambda_m/8
+            )
+        
         ax.set_xlabel("X (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Z (m)",fontsize=self.font_size_axis_labels)
 
@@ -97,39 +135,6 @@ class PlotterSyntheticArrayData:
         )
         ax.set_title(title_str,
                     fontsize=self.font_size_title)
-        if vels[0] > 0:
-            ax.set_xlim(
-                left=-1 * self.processor_SABF.lambda_m/8,
-                right=self.processor_SABF.p_x_m[0,5] + \
-                    self.processor_SABF.lambda_m/8
-            )
-            ax.set_xticks(
-                ticks=np.linspace(
-                    start=-1 * self.processor_SABF.lambda_m/8,
-                    stop=self.processor_SABF.p_x_m[0,5] + \
-                    self.processor_SABF.lambda_m/8,
-                    num=3
-                )
-            )
-        else:
-            ax.set_xlim(
-                right=1 * self.processor_SABF.lambda_m/8,
-                left=self.processor_SABF.p_x_m[0,5] - \
-                    self.processor_SABF.lambda_m/8
-            )
-            ax.set_xticks(
-                ticks=np.linspace(
-                    start=1 * self.processor_SABF.lambda_m/8,
-                    stop=self.processor_SABF.p_x_m[0,5] - \
-                    self.processor_SABF.lambda_m/8,
-                    num=4
-                )
-            )
-        ax.set_ylim(
-            bottom=-1 * self.processor_SABF.lambda_m/8,
-            top = self.processor_SABF.p_z_m[-1,1] + \
-                self.processor_SABF.lambda_m/8
-        )
 
         if show:
             plt.show()
@@ -139,26 +144,61 @@ class PlotterSyntheticArrayData:
         vels,
         ax:plt.Axes=None,
         show=False
-    ):
+    ):  
+        if not ax:
+                fig,ax = plt.subplots()
 
         #compute the geometries
         self.processor_SABF.generate_array_geometries(vels)
+        if self.processor_SABF.array_geometry_valid:
+            
+            x_coords = np.reshape(
+                self.processor_SABF.p_x_m,
+                newshape=(-1,1),
+                order='F'
+            )
+            y_coords = np.reshape(
+                self.processor_SABF.p_y_m,
+                newshape=(-1,1),
+                order='F'
+            )
 
-        if not ax:
-            fig,ax = plt.subplots()
+            ax.scatter(y_coords,x_coords)
 
-        x_coords = np.reshape(
-            self.processor_SABF.p_x_m,
-            newshape=(-1,1),
-            order='F'
-        )
-        y_coords = np.reshape(
-            self.processor_SABF.p_y_m,
-            newshape=(-1,1),
-            order='F'
-        )
+            if vels[0] > 0:
+                ax.set_ylim(
+                    bottom=-1 * self.processor_SABF.lambda_m/8,
+                    top=self.processor_SABF.p_x_m[0,5] + \
+                        self.processor_SABF.lambda_m/8
+                )
+                ax.set_yticks(
+                    ticks=np.linspace(
+                        start=-1 * self.processor_SABF.lambda_m/8,
+                        stop=self.processor_SABF.p_x_m[0,5] + \
+                        self.processor_SABF.lambda_m/8,
+                        num=3
+                    )
+                )
+            else:
+                ax.set_ylim(
+                    bottom=1 * self.processor_SABF.lambda_m/8,
+                    top=self.processor_SABF.p_x_m[0,5] - \
+                        self.processor_SABF.lambda_m/8
+                )
+                ax.set_yticks(
+                    ticks=np.linspace(
+                        start=1 * self.processor_SABF.lambda_m/8,
+                        stop=self.processor_SABF.p_x_m[0,5] - \
+                        self.processor_SABF.lambda_m/8,
+                        num=4
+                    )
+                )
+            ax.set_xlim(
+                right=-1 * self.processor_SABF.lambda_m/8,
+                left = self.processor_SABF.p_y_m[-1,1] + \
+                    self.processor_SABF.lambda_m/8
+            )
 
-        ax.scatter(y_coords,x_coords)
         ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
 
@@ -173,39 +213,6 @@ class PlotterSyntheticArrayData:
         )
         ax.set_title(title_str,
                     fontsize=self.font_size_title)
-        if vels[0] > 0:
-            ax.set_ylim(
-                bottom=-1 * self.processor_SABF.lambda_m/8,
-                top=self.processor_SABF.p_x_m[0,5] + \
-                    self.processor_SABF.lambda_m/8
-            )
-            ax.set_yticks(
-                ticks=np.linspace(
-                    start=-1 * self.processor_SABF.lambda_m/8,
-                    stop=self.processor_SABF.p_x_m[0,5] + \
-                    self.processor_SABF.lambda_m/8,
-                    num=3
-                )
-            )
-        else:
-            ax.set_ylim(
-                bottom=1 * self.processor_SABF.lambda_m/8,
-                top=self.processor_SABF.p_x_m[0,5] - \
-                    self.processor_SABF.lambda_m/8
-            )
-            ax.set_yticks(
-                ticks=np.linspace(
-                    start=1 * self.processor_SABF.lambda_m/8,
-                    stop=self.processor_SABF.p_x_m[0,5] - \
-                    self.processor_SABF.lambda_m/8,
-                    num=4
-                )
-            )
-        ax.set_xlim(
-            right=-1 * self.processor_SABF.lambda_m/8,
-            left = self.processor_SABF.p_y_m[-1,1] + \
-                self.processor_SABF.lambda_m/8
-        )
 
         if show:
             plt.show()
@@ -955,7 +962,7 @@ class PlotterSyntheticArrayData:
             axs[0,2].imshow(camera_view)
             axs[0,2].set_title("Frontal Camera View",fontsize=self.font_size_title)
         
-        if np.linalg.norm(vels) > self.min_vel:
+        if self.processor_SABF.array_geometry_valid:
             #compute the response
             resp = self.processor_SABF.process(
                 adc_cube

@@ -24,6 +24,8 @@ class SyntheticArrayBeamformerProcessor(_Processor):
                     stop=30,
                     num=30
                 )),
+            min_vel=0.2,
+            max_vel_change=0.1,
             mode:int = ENDFIRE_MODE) -> None:
         """_summary_
 
@@ -84,6 +86,14 @@ class SyntheticArrayBeamformerProcessor(_Processor):
 
         #sensing mode
         self.mode:str = mode
+
+        #parameters for when to generate the Synthetic response
+        self.min_vel = min_vel
+        self.max_vel_change = max_vel_change
+        self.last_vel:np.ndarray = np.array([0,0,0])
+
+        #flag for tracking if the response is valid or not
+        self.array_geometry_valid = False
 
         #load the configuration and configure the response
         super().__init__(config_manager)
@@ -199,6 +209,25 @@ class SyntheticArrayBeamformerProcessor(_Processor):
 
         return
 
+    def _check_array_geometry_valid(
+            self,
+            vels:np.ndarray=np.array([0,0,0])
+    ):  
+        vel_dif = np.abs(self.last_vel - vels)
+
+        #check to ensure min vel (in x,y) and that vel hasn't changed too much
+        if np.linalg.norm(vels[0:2]) > self.min_vel and \
+            np.linalg.norm(vel_dif) < self.max_vel_change:
+
+            self.array_geometry_valid = True
+        else:
+            self.array_geometry_valid = False
+        
+        #update the latset vel
+        self.last_vel = vels
+
+        return self.array_geometry_valid
+
     def generate_array_geometries(
         self,
         vels:np.ndarray=np.array([0,0,0])
@@ -213,14 +242,20 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             Defaults to np.array([0,0,0]).
         """
 
-        if self.mode == SyntheticArrayBeamformerProcessor.BROADSIDE_MODE:
-            self.generate_array_geometries_broadside(
-                vels=vels
-            )
-        elif self.mode == SyntheticArrayBeamformerProcessor.ENDFIRE_MODE:
-            self.generate_array_geometries_endfire(
-                vels = vels
-            )
+        #check for valid array geometry
+        if self._check_array_geometry_valid(vels):
+            
+            #only compute the array geometry if it is valid
+            if self.mode == SyntheticArrayBeamformerProcessor.BROADSIDE_MODE:
+                self.generate_array_geometries_broadside(
+                    vels=vels
+                )
+            elif self.mode == SyntheticArrayBeamformerProcessor.ENDFIRE_MODE:
+                self.generate_array_geometries_endfire(
+                    vels = vels
+                )
+        
+        return
         
     
     def generate_array_geometries_broadside(
@@ -444,25 +479,29 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             np.ndarray: _description_
         """
 
-        #reshpae the adc cube accordingly
+        #reshape the adc cube accordingly
         adc_cube_reshaped = np.transpose(adc_cube,axes=(1,0,2))
 
-        for az_angle_idx in range(self.az_angle_bins_rad.shape[0]):
-            for el_angle_idx in range(self.el_angle_bins_rad.shape[0]):
+        if self.array_geometry_valid:
+            for az_angle_idx in range(self.az_angle_bins_rad.shape[0]):
+                for el_angle_idx in range(self.el_angle_bins_rad.shape[0]):
 
-                steering_vector = self.d[:,az_angle_idx,el_angle_idx]
+                    steering_vector = self.d[:,az_angle_idx,el_angle_idx]
 
-                #get beamformed response at the stearing angle
-                resp = self.compute_response_at_stearing_angle(
-                    adc_cube_reshaped=adc_cube_reshaped,
-                    steering_vector=steering_vector
-                )
+                    #get beamformed response at the stearing angle
+                    resp = self.compute_response_at_stearing_angle(
+                        adc_cube_reshaped=adc_cube_reshaped,
+                        steering_vector=steering_vector
+                    )
 
-                #save the response and the cfar detections
-                self.beamformed_resp[:,az_angle_idx,el_angle_idx] = resp
+                    #save the response and the cfar detections
+                    self.beamformed_resp[:,az_angle_idx,el_angle_idx] = resp
 
 
-        #compute the cfar on the beamformed response
-        self.compute_2D_cfar_on_beamformed_resp()
+            #compute the cfar on the beamformed response
+            self.compute_2D_cfar_on_beamformed_resp()
 
-        return self.beamformed_resp
+            return self.beamformed_resp
+
+        else:
+            return None
