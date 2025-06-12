@@ -5,6 +5,7 @@ from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors.range_azmith_resp import RangeAzimuthProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
+from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerProcessor
 
 
 class PlotterMmWaveData:
@@ -214,6 +215,73 @@ class PlotterMmWaveData:
 
         if show:
             plt.show()
+
+    
+    ####################################################################
+    #MicroDoppler Response
+    ####################################################################
+    def plot_micro_doppler_resp(
+        self,
+        resp:np.ndarray,
+        micro_doppler_processor:MicroDopplerProcessor,
+        convert_to_dB=False,
+        cmap="viridis",
+        ax:plt.Axes=None,
+        show=False
+        ):
+        """Plot the range doppler response
+
+        Args:
+            resp (np.ndarray): range_bins x velocity bins np.ndarray of the already computed
+                range doppler response
+            range_doppler_processor (RangeDopplerProcessor): RangeDopplerProcessor object
+                used to generate the response
+            convert_to_dB (bool, optional): on True, converts the response to a 
+                log scale. Defaults to False.
+            cmap (str, optional): the color map used for the generated plot
+                (gray is another option). Defaults to "viridis".
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
+        if not ax:
+            fig,ax = plt.subplots()
+        
+        if convert_to_dB:
+            resp = 20 * np.log10(resp)
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
+        
+        im = ax.imshow(
+            resp,#np.flip(resp,axis=0),
+            extent=[
+                micro_doppler_processor.time_bins[0],
+                micro_doppler_processor.time_bins[-1],
+                micro_doppler_processor.vel_bins[0],
+                micro_doppler_processor.vel_bins[-1],
+            ],
+            cmap=cmap,
+            aspect='auto',
+            interpolation='bilinear'
+            )
+        ax.set_xlabel("Time History (s)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("Velocity (m/s)",fontsize=self.font_size_axis_labels)
+        if convert_to_dB:
+            ax.set_title("Micro-Doppler\nHeatmap (dB)",fontsize=self.font_size_title)
+        else:
+            ax.set_title("Micro-Doppler\nHeatmap (mag)",fontsize=self.font_size_title)
+        ax.tick_params(labelsize=self.font_size_ticks)
+
+        #add the colorbar
+        # cbar = plt.colorbar(im, ax=ax)
+        # cbar.set_label('Intensity', fontsize=12)
+
+        if show:
+            plt.show()
     
     ####################################################################
     #Doppler Azimuth Response
@@ -336,6 +404,7 @@ class PlotterMmWaveData:
             range_doppler_processor:RangeDopplerProcessor,
             range_azimuth_processor:RangeAzimuthProcessor,
             doppler_azimuth_processor:DopplerAzimuthProcessor,
+            micro_doppler_processor:MicroDopplerProcessor,
             camera_view:np.ndarray=np.empty(shape=(0)),
             convert_to_dB=False,
             cmap="viridis",
@@ -383,9 +452,23 @@ class PlotterMmWaveData:
             ax=axs[1,0],
             show=False
         )
-        self.plot_range_az_resp_polar(
-            resp=resp,
-            range_azimuth_processor=range_azimuth_processor,
+        # self.plot_range_az_resp_polar(
+        #     resp=resp,
+        #     range_azimuth_processor=range_azimuth_processor,
+        #     convert_to_dB=convert_to_dB,
+        #     cmap=cmap,
+        #     ax=axs[1,1],
+        #     show=False
+        # )
+
+        #plot micro-doppler signature
+        resp = micro_doppler_processor.process(
+            adc_cube=adc_cube,
+            rx_idx=rx_antenna_idx
+        )
+        self.plot_micro_doppler_resp(
+            resp,
+            micro_doppler_processor=micro_doppler_processor,
             convert_to_dB=convert_to_dB,
             cmap=cmap,
             ax=axs[1,1],

@@ -203,13 +203,12 @@ class PlotterSyntheticArrayData:
         ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
 
         formatted_vels = np.array2string(
-            vels,
+            vels[0:2],
             formatter={'float_kind': lambda x: f"{x:.2f}"},
             separator=', '
         )
-        title_str = "Synth Array: vel ({} m/s)\n, {} chirps".format(
-            formatted_vels,
-            self.processor_SABF.chirps_per_frame
+        title_str = "Dynamically computed array:\nvelocity: {} m/s".format(
+            formatted_vels
         )
         ax.set_title(title_str,
                     fontsize=self.font_size_title)
@@ -959,8 +958,8 @@ class PlotterSyntheticArrayData:
 
         #plot the camera view
         if camera_view.shape[0] > 0:
-            axs[0,2].imshow(camera_view)
-            axs[0,2].set_title("Frontal Camera View",fontsize=self.font_size_title)
+            axs[1,1].imshow(camera_view)
+            axs[1,1].set_title("Frontal Camera View",fontsize=self.font_size_title)
         
         if self.processor_SABF.array_geometry_valid:
             #compute the response
@@ -984,7 +983,7 @@ class PlotterSyntheticArrayData:
                 resp=resp,
                 convert_to_dB=convert_to_dB,
                 cmap=cmap,
-                ax=axs[1,1],
+                ax=axs[0,2],
                 show=False
             )
 

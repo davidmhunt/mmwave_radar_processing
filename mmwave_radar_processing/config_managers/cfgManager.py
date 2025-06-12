@@ -145,7 +145,7 @@ class ConfigManager:
 
         # velocity_resolution_m_per_s
         self.vel_res_m_s = lambda_m / (
-            2 * chirp_period_us * chirps_per_loop * 1e-6 * num_chirps_per_frame
+            2 * chirp_period_us * chirps_per_loop * 1e-6 * chirp_loops_per_frame
         )
 
         # max_velocity

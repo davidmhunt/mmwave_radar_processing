@@ -3,6 +3,7 @@ from cpsl_datasets.cpsl_ds import CpslDS
 from mmwave_radar_processing.processors.range_azmith_resp import RangeAzimuthProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
+from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerProcessor
 from mmwave_radar_processing.processors.virtual_array_reformater import VirtualArrayReformatter
 from mmwave_radar_processing.plotting.plotter_mmWave_data import PlotterMmWaveData
 from mmwave_radar_processing.plotting.movie_generator import MovieGenerator
@@ -16,6 +17,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
                  range_azimuth_processor:RangeAzimuthProcessor,
                  range_doppler_processor:RangeDopplerProcessor,
                  doppler_azimuth_processor:DopplerAzimuthProcessor,
+                 micro_doppler_processor:MicroDopplerProcessor,
                  virtual_array_reformatter:VirtualArrayReformatter,
                  temp_dir_path="~/Downloads/odometry_temp",
                  ) -> None:
@@ -24,6 +26,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
         self.range_azimuth_processor:RangeAzimuthProcessor = range_azimuth_processor
         self.range_doppler_processor:RangeDopplerProcessor = range_doppler_processor
         self.doppler_azimuth_processor:DopplerAzimuthProcessor = doppler_azimuth_processor
+        self.micro_doppler_processor:MicroDopplerProcessor = micro_doppler_processor
         self.virtual_array_reformatter = virtual_array_reformatter
         
         super().__init__(
@@ -67,6 +70,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
             range_doppler_processor=self.range_doppler_processor,
             range_azimuth_processor=self.range_azimuth_processor,
             doppler_azimuth_processor=self.doppler_azimuth_processor,
+            micro_doppler_processor=self.micro_doppler_processor,
             camera_view=camera_view,
             convert_to_dB=convert_to_dB,
             cmap=cmap,
