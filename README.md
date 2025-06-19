@@ -97,8 +97,9 @@ In order to use any datasets in your computer's directory, you must first create
 1. Create a .env file in your project's root directory. This will file will not be uploaded to GitHub when you commit your changes.
 2. Inside the .env file, add these variables
 ```
-DATASET_DIRECTORY=/example/your_directory
-MAP_DIRECTORY=/example/your_directory
-MOVIE_TEMP_DIRECTORY=/example/your_directory
+DATASET_DIRECTORY=/path/to/datasets
+CONFIG_DIRECTORY=/path/to/mmwave_radar_processing/configs
+MOVIE_TEMP_DIRECTORY=/path/to/movie/temp/movie_temp_directory
+ANALYZER_TEMP_DIRECTORY=/path/to/temp/analyzer_directory
 ```
 3. Replace the example text with the path to your directory
