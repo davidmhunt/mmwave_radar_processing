@@ -19,9 +19,9 @@ sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt update
 ```
 
-3. Install python 3.10 along with the required development dependencies
+3. Install python 3.12 along with the required development dependencies
 ```
-sudo apt install python3.10 python3.10-dev
+sudo apt install python3.12 python3.12-dev
 ```
 
 The following resources may be helpful [Deadsnakes PPA description](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa), [Tutorial on Deadsnakes on Ubuntu](https://preocts.github.io/python/20221230-deadsnakes/)
