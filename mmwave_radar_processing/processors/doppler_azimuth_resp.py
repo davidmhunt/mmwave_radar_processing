@@ -26,7 +26,7 @@ class DopplerAzimuthProcessor(_Processor):
         
         self.vel_bins = np.arange(
             start=-1 * self.config_manager.vel_max_m_s,
-            stop = self.config_manager.vel_max_m_s - self.config_manager.vel_res_m_s,
+            stop = self.config_manager.vel_max_m_s - self.config_manager.vel_res_m_s + 1e-3,
             step= self.config_manager.vel_res_m_s
         )
 

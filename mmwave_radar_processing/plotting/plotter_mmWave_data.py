@@ -288,6 +288,61 @@ class PlotterMmWaveData:
     ####################################################################
     def plot_doppler_az_resp(
         self,
+        resp: np.ndarray,
+        doppler_azimuth_processor: DopplerAzimuthProcessor,
+        convert_to_dB=False,
+        cmap="viridis",
+        ax: plt.Axes = None,
+        show=False
+    ):
+        """Plot the Doppler-Azimuth response using a meshgrid for non-uniform bins."""
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        if convert_to_dB:
+            resp = 20 * np.log10(resp)
+            # Thresholding to remove very low values
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            resp = np.maximum(resp, thresholded_val)
+
+        # Get velocity and angle bins
+        vel_bins = doppler_azimuth_processor.vel_bins
+        angle_bins = doppler_azimuth_processor.angle_bins
+
+        # Make 2D meshgrid
+        angle_grid, vel_grid = np.meshgrid(angle_bins, vel_bins)
+
+        # Flip response vertically to match orientation
+        # resp_flipped = np.flip(resp, axis=0)
+
+        # Plot using pcolormesh
+        mesh = ax.pcolormesh(
+            angle_grid,
+            vel_grid,
+            resp,
+            shading='nearest',
+            cmap=cmap
+        )
+
+        ax.set_ylabel("Velocity (m/s)", fontsize=self.font_size_axis_labels)
+        ax.set_xlabel("Angle (radians)", fontsize=self.font_size_axis_labels)
+        ax.set_title(
+            "Doppler-Azimuth\nHeatmap (dB)" if convert_to_dB else "Doppler-Azimuth\nHeatmap (mag)",
+            fontsize=self.font_size_title
+        )
+        ax.tick_params(labelsize=self.font_size_ticks)
+
+        # Optional colorbar
+        # cbar = plt.colorbar(mesh, ax=ax)
+        # cbar.set_label('Intensity', fontsize=12)
+
+        if show:
+            plt.show()
+
+
+    def plot_doppler_az_resp_old(
+        self,
         resp:np.ndarray,
         doppler_azimuth_processor:DopplerAzimuthProcessor,
         convert_to_dB=False,
@@ -401,10 +456,10 @@ class PlotterMmWaveData:
     def plot_compilation(
             self,
             adc_cube:np.ndarray,
-            range_doppler_processor:RangeDopplerProcessor,
-            range_azimuth_processor:RangeAzimuthProcessor,
-            doppler_azimuth_processor:DopplerAzimuthProcessor,
-            micro_doppler_processor:MicroDopplerProcessor,
+            range_doppler_processor:RangeDopplerProcessor=None,
+            range_azimuth_processor:RangeAzimuthProcessor=None,
+            doppler_azimuth_processor:DopplerAzimuthProcessor=None,
+            micro_doppler_processor:MicroDopplerProcessor=None,
             camera_view:np.ndarray=np.empty(shape=(0)),
             convert_to_dB=False,
             cmap="viridis",
@@ -427,31 +482,33 @@ class PlotterMmWaveData:
         )
 
         #plot range doppler plot
-        resp = range_doppler_processor.process(
-            adc_cube=adc_cube,
-            rx_idx=rx_antenna_idx)
-        self.plot_range_doppler_resp(
-            resp=resp,
-            range_doppler_processor=range_doppler_processor,
-            convert_to_dB=convert_to_dB,
-            cmap=cmap,
-            ax=axs[0,1],
-            show=False
-        )
+        if range_doppler_processor:
+            resp = range_doppler_processor.process(
+                adc_cube=adc_cube,
+                rx_idx=rx_antenna_idx)
+            self.plot_range_doppler_resp(
+                resp=resp,
+                range_doppler_processor=range_doppler_processor,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=axs[0,1],
+                show=False
+            )
 
         #plot the range azimuth plots
-        resp = range_azimuth_processor.process(
-            adc_cube=adc_cube,
-            chirp_idx=chirp_idx
-        )
-        self.plot_range_az_resp_cart(
-            resp=resp,
-            range_azimuth_processor=range_azimuth_processor,
-            convert_to_dB=convert_to_dB,
-            cmap=cmap,
-            ax=axs[1,0],
-            show=False
-        )
+        if range_azimuth_processor:
+            resp = range_azimuth_processor.process(
+                adc_cube=adc_cube,
+                chirp_idx=chirp_idx
+            )
+            self.plot_range_az_resp_cart(
+                resp=resp,
+                range_azimuth_processor=range_azimuth_processor,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=axs[1,0],
+                show=False
+            )
         # self.plot_range_az_resp_polar(
         #     resp=resp,
         #     range_azimuth_processor=range_azimuth_processor,
@@ -462,31 +519,33 @@ class PlotterMmWaveData:
         # )
 
         #plot micro-doppler signature
-        resp = micro_doppler_processor.process(
-            adc_cube=adc_cube,
-            rx_idx=rx_antenna_idx
-        )
-        self.plot_micro_doppler_resp(
-            resp,
-            micro_doppler_processor=micro_doppler_processor,
-            convert_to_dB=convert_to_dB,
-            cmap=cmap,
-            ax=axs[1,1],
-            show=False
-        )
+        if micro_doppler_processor:
+            resp = micro_doppler_processor.process(
+                adc_cube=adc_cube,
+                rx_idx=rx_antenna_idx
+            )
+            self.plot_micro_doppler_resp(
+                resp,
+                micro_doppler_processor=micro_doppler_processor,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=axs[1,1],
+                show=False
+            )
 
         #plot the doppler-azimuth response
-        resp = doppler_azimuth_processor.process(
-            adc_cube=adc_cube
-        )
-        self.plot_doppler_az_resp(
-            resp=resp,
-            doppler_azimuth_processor=doppler_azimuth_processor,
-            convert_to_dB=convert_to_dB,
-            cmap=cmap,
-            ax=axs[0,2],
-            show=False
-        )
+        if doppler_azimuth_processor:
+            resp = doppler_azimuth_processor.process(
+                adc_cube=adc_cube
+            )
+            self.plot_doppler_az_resp(
+                resp=resp,
+                doppler_azimuth_processor=doppler_azimuth_processor,
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=axs[0,2],
+                show=False
+            )
         #camera view
         if camera_view.shape[0] > 0:
             axs[1,2].imshow(camera_view)
