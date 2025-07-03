@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
-from mmwave_radar_processing.processors.range_azmith_resp import RangeAzimuthProcessor
+from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
 from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerProcessor
@@ -32,7 +32,7 @@ class PlotterMmWaveData:
     def plot_range_az_resp_cart(
         self,
         resp:np.ndarray,
-        range_azimuth_processor:RangeAzimuthProcessor,
+        range_azimuth_processor:RangeAngleProcessor,
         convert_to_dB=False,
         cmap="viridis",
         ax:plt.Axes=None,
@@ -93,7 +93,7 @@ class PlotterMmWaveData:
     def plot_range_az_resp_polar(
         self,
         resp:np.ndarray,
-        range_azimuth_processor:RangeAzimuthProcessor,
+        range_azimuth_processor:RangeAngleProcessor,
         convert_to_dB=False,
         cmap="viridis",
         ax:plt.Axes=None,
@@ -457,7 +457,7 @@ class PlotterMmWaveData:
             self,
             adc_cube:np.ndarray,
             range_doppler_processor:RangeDopplerProcessor=None,
-            range_azimuth_processor:RangeAzimuthProcessor=None,
+            range_azimuth_processor:RangeAngleProcessor=None,
             doppler_azimuth_processor:DopplerAzimuthProcessor=None,
             micro_doppler_processor:MicroDopplerProcessor=None,
             camera_view:np.ndarray=np.empty(shape=(0)),

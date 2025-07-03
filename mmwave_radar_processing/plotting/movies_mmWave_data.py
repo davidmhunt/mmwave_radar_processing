@@ -1,6 +1,6 @@
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from cpsl_datasets.cpsl_ds import CpslDS
-from mmwave_radar_processing.processors.range_azmith_resp import RangeAzimuthProcessor
+from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
 from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerProcessor
@@ -14,7 +14,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
     def __init__(self,
                  cpsl_dataset:CpslDS,
                  plotter:PlotterMmWaveData,
-                 range_azimuth_processor:RangeAzimuthProcessor,
+                 range_azimuth_processor:RangeAngleProcessor,
                  range_doppler_processor:RangeDopplerProcessor,
                  doppler_azimuth_processor:DopplerAzimuthProcessor,
                  micro_doppler_processor:MicroDopplerProcessor,
@@ -23,7 +23,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
                  ) -> None:
         
         self.plotter:PlotterMmWaveData = plotter
-        self.range_azimuth_processor:RangeAzimuthProcessor = range_azimuth_processor
+        self.range_azimuth_processor:RangeAngleProcessor = range_azimuth_processor
         self.range_doppler_processor:RangeDopplerProcessor = range_doppler_processor
         self.doppler_azimuth_processor:DopplerAzimuthProcessor = doppler_azimuth_processor
         self.micro_doppler_processor:MicroDopplerProcessor = micro_doppler_processor

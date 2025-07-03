@@ -2,6 +2,7 @@ import numpy as np
 from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
+from numpy.lib.stride_tricks import sliding_window_view
 
 
 class CaCFAR_1D:
@@ -151,6 +152,120 @@ class CaCFAR_1D:
 
         if show:
             plt.show()
+
+class OsCFAR_1D_Vectorized:
+    def __init__(
+            self,
+            config_manager,
+            num_guard_cells=4,
+            num_training_cells=10,
+            k_rank=None,
+            false_alarm_rate=0.1,
+            resp_border_cells=3,
+            mode="valid"
+    ):
+        self.num_guard_cells = num_guard_cells
+        self.num_training_cells = num_training_cells
+        self.resp_border_cells = resp_border_cells
+        self.config_manager = config_manager
+        self.mode = mode
+
+        self.N = 2 * num_training_cells
+        self.k_rank = k_rank if k_rank is not None else self.N // 2
+        self.alpha = self.N * (false_alarm_rate ** (-1 / self.N) - 1)
+
+        self.ranges = np.linspace(
+            0,
+            self.config_manager.range_max_m,
+            self.config_manager.get_num_adc_samples(profile_idx=0)
+        )
+
+        # Determine valid indices for plotting
+        total_guard_train = num_guard_cells + num_training_cells
+        if self.mode == "valid":
+            self.valid_idxs = np.ones_like(self.ranges, dtype=bool)
+            self.valid_idxs[:self.resp_border_cells + total_guard_train] = False
+            self.valid_idxs[-(self.resp_border_cells + total_guard_train):] = False
+        elif self.mode == "full":
+            self.valid_idxs = np.ones_like(self.ranges, dtype=bool)
+            self.valid_idxs[:self.resp_border_cells] = False
+            self.valid_idxs[-self.resp_border_cells:] = False
+        else:
+            raise ValueError("mode must be 'valid' or 'full'")
+
+        print(f"Vectorized OS-CFAR using k={self.k_rank}, alpha={self.alpha:.2f}, mode={self.mode}")
+
+    def compute(self, signal: np.ndarray):
+        signal = np.abs(signal)
+        num_cells = len(signal)
+        det_idxs = np.zeros_like(signal, dtype=bool)
+        T_full = np.zeros_like(signal)
+
+        window_size = 2 * (self.num_training_cells + self.num_guard_cells) + 1
+        guard_start = self.num_training_cells
+        guard_end = guard_start + 2 * self.num_guard_cells + 1
+        training_mask = np.ones(window_size, dtype=bool)
+        training_mask[guard_start:guard_end] = False
+
+        if self.mode == "valid":
+            # Use only valid region (cutting off edges)
+            start = self.resp_border_cells + self.num_training_cells + self.num_guard_cells
+            stop = num_cells - self.resp_border_cells - self.num_training_cells - self.num_guard_cells
+            signal_cut = signal[start:stop]
+
+            windows = sliding_window_view(signal, window_shape=window_size)
+            windows = windows[start:stop]
+
+            training_cells = windows[:, training_mask]
+            sorted_training = np.sort(training_cells, axis=1)
+            P_n = sorted_training[:, self.k_rank]
+            T = self.alpha * P_n
+
+            dets = signal_cut > T
+            det_idxs[start:stop] = dets
+            T_full[start:stop] = T
+
+        elif self.mode == "full":
+            # Pad signal to compute CFAR across full width
+            pad_width = self.num_guard_cells + self.num_training_cells
+            signal_padded = np.pad(signal, pad_width=(pad_width,), mode='constant', constant_values=0)
+
+            windows = sliding_window_view(signal_padded, window_shape=window_size)  # shape: (N, window_size)
+            training_cells = windows[:, training_mask]
+            sorted_training = np.sort(training_cells, axis=1)
+            P_n = sorted_training[:, self.k_rank]
+            T = self.alpha * P_n
+
+            cut = signal
+            dets = cut > T
+            det_idxs = dets
+            T_full = T
+
+        return det_idxs, T_full
+
+    def plot_cfar(self, signal, ax=None, show=False):
+        det_idxs, T = self.compute(signal)
+
+        signal_dB = 20 * np.log10(np.abs(signal) + 1e-12)
+        T_dB = 20 * np.log10(T + 1e-12)
+
+        det_ranges = self.ranges[det_idxs]
+        det_mags = signal_dB[det_idxs]
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        ax.plot(self.ranges, signal_dB, label='Signal')
+        ax.plot(self.ranges[self.valid_idxs], T_dB[self.valid_idxs], label='OS-CFAR Threshold', linestyle='--')
+        ax.plot(det_ranges, det_mags, 'ro', label='Detections')
+        ax.set_xlabel('Range (m)')
+        ax.set_ylabel('Amplitude (dB)')
+        ax.set_title(f'1D OS-CFAR Detector (mode="{self.mode}")')
+        ax.legend()
+
+        if show:
+            plt.show()
+
 
 
 class CaCFAR_2D:

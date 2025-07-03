@@ -92,6 +92,9 @@ class ConfigManager:
         # status flags
         self.config_loaded = False
 
+        #array geometry #whether or not using the ods array geometry
+        self.array_geometry = "standard" #"standard" or "ods"
+
         return
 
     ####################################################################
@@ -184,7 +187,17 @@ class ConfigManager:
     #loading the radar configuration
     ####################################################################
 
-    def load_cfg(self,cfg_file_path:str):
+    def load_cfg(self,cfg_file_path:str,array_geometry:str = "standard"):
+        """Load a configuration
+
+        Args:
+            cfg_file_path (str): _description_
+            array_geometry (str, optional): "standard" or "ods".
+                Specifies the array geometry of the radar. 
+                Defaults to "standard".
+        """
+
+        self.array_geometry = array_geometry
 
         f = open(cfg_file_path)
         for line in f:

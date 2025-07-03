@@ -3,7 +3,7 @@ import numpy as np
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
 
-class RangeAzimuthProcessor(_Processor):
+class RangeAngleProcessor(_Processor):
 
     def __init__(
             self,
