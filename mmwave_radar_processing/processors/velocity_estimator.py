@@ -3,6 +3,12 @@ from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
 
 class VelocityEstimator(DopplerAzimuthProcessor):
+    """Estimate ego velocity using Doppler-azimuth processing.
+    Note the coordinate system of the Doppler-azimuth processing x-forward, y-left
+
+    Args:
+        DopplerAzimuthProcessor (_type_): _description_
+    """
     def __init__(
             self,
             config_manager: ConfigManager,
@@ -46,11 +52,14 @@ class VelocityEstimator(DopplerAzimuthProcessor):
         #peaks
         self.peak_threshold_dB = peak_threshold_dB
         self.azimuth_peaks:np.ndarray = None
+        self.azimuth_peak_zero_az:np.ndarray = None
         self.elevation_peaks:np.ndarray = None
+        self.elevation_peak_zero_az:np.ndarray = None
 
         #velocity estimates and residuals
         self.min_vel_mag = min_velocity_mag
         self.max_residual = max_residual
+        self.vx_estimate:float = 0.0 #estimated velocity in the x direction of the array (0 azimuth/elevation)
         self.azimuth_velocity_estimate:np.ndarray = np.empty(shape=0)
         self.azimuth_velocity_residual:float = np.empty(shape=0)
         self.elevation_velocity_estimate:np.ndarray = np.empty(shape=0)
@@ -109,9 +118,16 @@ class VelocityEstimator(DopplerAzimuthProcessor):
             self,
             adc_cube:np.ndarray,
             altitude:float = 0.0,
-            use_precise_fft: bool = False):
+            use_precise_fft: bool = False,
+            precise_fft_center_vel: float = 0.0):
 
         range_window = self.get_range_window(altitude=altitude)
+
+        precise_vel_range = np.array([
+            precise_fft_center_vel - self.precise_vel_bound,
+            precise_fft_center_vel + self.precise_vel_bound
+        ])
+
 
         if self.config_manager.array_geometry == "standard":
             if self.config_manager.virtual_antennas_enabled:
@@ -124,7 +140,7 @@ class VelocityEstimator(DopplerAzimuthProcessor):
                 rx_antennas=rx_antennas,
                 range_window=range_window,
                 use_precise_fft=use_precise_fft,
-                precise_vel_bound=self.precise_vel_bound
+                precise_vel_range=precise_vel_range
             )
         elif self.config_manager.array_geometry == "ods":
             if self.config_manager.virtual_antennas_enabled:
@@ -140,7 +156,7 @@ class VelocityEstimator(DopplerAzimuthProcessor):
                 range_window=range_window,
                 shift_angle=True,
                 use_precise_fft=use_precise_fft,
-                precise_vel_bound=self.precise_vel_bound
+                precise_vel_range=precise_vel_range
             )
 
             resp_2 = super().process(
@@ -149,33 +165,29 @@ class VelocityEstimator(DopplerAzimuthProcessor):
                 range_window=range_window,
                 shift_angle=True,
                 use_precise_fft=use_precise_fft,
-                precise_vel_bound=self.precise_vel_bound
+                precise_vel_range=precise_vel_range
             )
 
             az_resp_mag = (resp_1 + resp_2) / 2
 
         if use_precise_fft:
             self.precise_azimuth_response_mag = az_resp_mag
-            self.azimuth_peaks = self.detect_peaks(
-                doppler_azimuth_resp_mag=az_resp_mag,
-                vel_bins=self.zoomed_vel_bins,
-                min_threshold_dB=self.peak_threshold_dB
-            )
         else:
             self.azimuth_response_mag = az_resp_mag
-            self.azimuth_peaks = self.detect_peaks(
-                doppler_azimuth_resp_mag=az_resp_mag,
-                vel_bins=self.vel_bins,
-                min_threshold_dB=self.peak_threshold_dB
-            )
     
     def compute_elevation_response(
             self,
             adc_cube:np.ndarray,
             altitude:float = 0.0,
-            use_precise_fft: bool = False):
+            use_precise_fft: bool = False,
+            precise_fft_center_vel: float = 0.0):
 
         range_window = self.get_range_window(altitude=altitude)
+
+        precise_vel_range = np.array([
+            precise_fft_center_vel - self.precise_vel_bound,
+            precise_fft_center_vel + self.precise_vel_bound
+        ])
 
         if self.config_manager.array_geometry == "standard":
             raise NotImplementedError(
@@ -195,7 +207,7 @@ class VelocityEstimator(DopplerAzimuthProcessor):
                 range_window=range_window,
                 shift_angle=False,
                 use_precise_fft=use_precise_fft,
-                precise_vel_bound=self.precise_vel_bound
+                precise_vel_range=precise_vel_range
             )
 
             resp_2 = super().process(
@@ -204,25 +216,94 @@ class VelocityEstimator(DopplerAzimuthProcessor):
                 range_window=range_window,
                 shift_angle=False,
                 use_precise_fft=use_precise_fft,
-                precise_vel_bound=self.precise_vel_bound
+                precise_vel_range=precise_vel_range
             )
 
             elevation_response_mag = (resp_1 + resp_2) / 2
         
         if use_precise_fft:
             self.precise_elevation_response_mag = elevation_response_mag
-            self.elevation_peaks = self.detect_peaks(
-                doppler_azimuth_resp_mag=elevation_response_mag,
-                vel_bins=self.zoomed_vel_bins,
-                min_threshold_dB=self.peak_threshold_dB
-            )
         else:
             self.elevation_response_mag = elevation_response_mag
-            self.elevation_peaks = self.detect_peaks(
-                doppler_azimuth_resp_mag=elevation_response_mag,
-                vel_bins=self.vel_bins,
-                min_threshold_dB=self.peak_threshold_dB
-            )
+    
+    def detect_vel_row_peaks(
+            self,
+            use_precise_response:bool = False
+    ):
+        """Detect peaks in the azimuth and elevation responses.
+
+        Args:
+            use_precise_response (bool, optional): If True, use the precise (zoom FFT) responses for peak detection. Defaults to False.
+        """
+
+        if use_precise_response:
+            if self.precise_azimuth_response_mag is not None:
+                self.azimuth_peaks = self.detect_peaks_rows(
+                    doppler_azimuth_resp_mag=self.precise_azimuth_response_mag,
+                    vel_bins=self.zoomed_vel_bins,
+                    min_threshold_dB=self.peak_threshold_dB
+                )
+            if self.precise_elevation_response_mag is not None:
+                self.elevation_peaks = self.detect_peaks_rows(
+                    doppler_azimuth_resp_mag=self.precise_elevation_response_mag,
+                    vel_bins=self.zoomed_vel_bins,
+                    min_threshold_dB=self.peak_threshold_dB
+                )
+        else:
+            if self.azimuth_response_mag is not None:
+                self.azimuth_peaks = self.detect_peaks_rows(
+                    doppler_azimuth_resp_mag=self.azimuth_response_mag,
+                    vel_bins=self.vel_bins,
+                    min_threshold_dB=self.peak_threshold_dB
+                )
+            if self.elevation_response_mag is not None:
+                self.elevation_peaks = self.detect_peaks_rows(
+                    doppler_azimuth_resp_mag=self.elevation_response_mag,
+                    vel_bins=self.vel_bins,
+                    min_threshold_dB=self.peak_threshold_dB
+                )
+        
+        return
+    
+    def detect_vel_zero_az_peaks(
+            self,
+            use_precise_response:bool = False
+    ):
+        """Detect the peak closest to zero azimuth in the azimuth and elevation responses.
+
+        Args:
+            use_precise_response (bool, optional): If True, use the precise (zoom FFT) responses for peak detection. Defaults to False.
+        """
+
+        if use_precise_response:
+            if self.precise_azimuth_response_mag is not None:
+                self.azimuth_peak_zero_az = self.detect_peak_zero_az(
+                    doppler_azimuth_resp_mag=self.precise_azimuth_response_mag,
+                    vel_bins=self.zoomed_vel_bins,
+                    min_threshold_dB=self.peak_threshold_dB
+                )
+            if self.precise_elevation_response_mag is not None:
+                self.elevation_peak_zero_az = self.detect_peak_zero_az(
+                    doppler_azimuth_resp_mag=self.precise_elevation_response_mag,
+                    vel_bins=self.zoomed_vel_bins,
+                    min_threshold_dB=self.peak_threshold_dB
+                )
+        else:
+            if self.azimuth_response_mag is not None:
+                self.azimuth_peak_zero_az = self.detect_peak_zero_az(
+                    doppler_azimuth_resp_mag=self.azimuth_response_mag,
+                    vel_bins=self.vel_bins,
+                    min_threshold_dB=self.peak_threshold_dB
+                )
+            if self.elevation_response_mag is not None:
+                self.elevation_peak_zero_az = self.detect_peak_zero_az(
+                    doppler_azimuth_resp_mag=self.elevation_response_mag,
+                    vel_bins=self.vel_bins,
+                    min_threshold_dB=self.peak_threshold_dB
+                )
+        
+        return
+    
 
     def lsq_fit_ego_velocity(
             self,
@@ -279,6 +360,19 @@ class VelocityEstimator(DopplerAzimuthProcessor):
         angles = np.stack([np.cos(self.valid_angle_bins), np.sin(self.valid_angle_bins)], axis=-1)
         return -1 * np.dot(angles, v)
 
+    def estimate_ego_vx_velocity(self):
+        """Estimate ego velocity in the x direction of the radar(i.e. at zero doppler/elevation).
+
+        Returns:
+            float: Estimated ego velocity in the x direction.
+        """
+        
+        az_peak = self.azimuth_peak_zero_az
+        el_peak = self.elevation_peak_zero_az
+        self.vx_estimate = (az_peak[1] + el_peak[1]) / 2.0
+
+        return self.vx_estimate
+    
     def estimate_ego_velocity(
             self):
         """Estimate ego velocity from the detected peaks.
@@ -369,15 +463,28 @@ class VelocityEstimator(DopplerAzimuthProcessor):
             altitude=altitude,
             use_precise_fft=False)
         
+        #estimate vx (corresponding to zero doppler) using the coarse doppler_azimuth_responses
+        self.detect_vel_zero_az_peaks(use_precise_response=False)
+        self.estimate_ego_vx_velocity()
+
         if enable_precise_responses:
             self.compute_azimuth_response(
                 adc_cube=adc_cube,
                 altitude=altitude,
-                use_precise_fft=True)
+                use_precise_fft=True,
+                precise_fft_center_vel=self.vx_estimate)
             self.compute_elevation_response(
                 adc_cube=adc_cube,
                 altitude=altitude,
-                use_precise_fft=True)
+                use_precise_fft=True,
+                precise_fft_center_vel=self.vx_estimate)
+
+            #re-estimate ego vx using the precise doppler_azimuth_responses
+            self.detect_vel_zero_az_peaks(use_precise_response=True)
+            self.estimate_ego_vx_velocity()
+
+        #estimate the velocity
+        self.detect_vel_row_peaks(use_precise_response=enable_precise_responses)
             
         #estimate the velocity from the detected peaks in the respective responses
         self.estimate_ego_velocity()

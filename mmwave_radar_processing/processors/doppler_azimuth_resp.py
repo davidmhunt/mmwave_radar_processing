@@ -5,13 +5,20 @@ from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
 
 class DopplerAzimuthProcessor(_Processor):
+    """Process Doppler-azimuth data for radar applications.
+    Note the coordinate system of the Doppler-azimuth processing x-forward, y-left
+
+    Args:
+        _Processor (_type_): _description_
+    """
 
     def __init__(
             self,
             config_manager: ConfigManager,
             num_angle_bins:int = 64,
             valid_angle_range: np.ndarray = np.array(
-                [np.deg2rad(-60), np.deg2rad(60)])) -> None:
+                [np.deg2rad(-60), np.deg2rad(60)]),
+            min_zoom_fft_vel_span = 0.1) -> None:
 
         #range bins
         self.num_range_bins = None
@@ -19,6 +26,9 @@ class DopplerAzimuthProcessor(_Processor):
         #velocity bins
         self.vel_bins:np.ndarray = None
         self.zoomed_vel_bins:np.ndarray = None
+
+        #parameters zoom FFT
+        self.min_zoom_fft_vel_span = min_zoom_fft_vel_span #m/s
 
         #angle bins
         self.num_angle_bins = num_angle_bins
@@ -143,12 +153,50 @@ class DopplerAzimuthProcessor(_Processor):
         zoom_resp = np.abs(np.fft.fft(zoom_resp, axis=2))
 
         return zoom_resp
+
+    def set_zoomed_fft_vel_bins(self, vel_range):
+        """Set the velocity bins for the zoomed FFT.
+
+        Args:
+            vel_range (np.ndarray): The velocity range for the zoomed FFT.
+
+        Returns:
+            np.ndarray: The velocity bins for the zoomed FFT.
+        """
+
+        # Generate 100 velocity bins less than or equal to zero
+        neg_vel_bins = np.linspace(
+            start=vel_range[0],
+            stop=min(-1e-4, vel_range[1]),
+            num=100 if vel_range[0] <= 0 else 0,
+            endpoint=False
+        )
+
+        # Generate 100 velocity bins greater than zero
+        pos_vel_bins = np.linspace(
+            start=max(1e-4, vel_range[0]),
+            stop=vel_range[1],
+            num=100 if vel_range[1] > 0 else 0,
+            endpoint=False
+        )
+
+        # Concatenate the velocity bins
+        if neg_vel_bins.size > 0 and pos_vel_bins.size > 0:
+            self.zoomed_vel_bins = np.concatenate((neg_vel_bins, pos_vel_bins))
+        elif neg_vel_bins.size > 0:
+            self.zoomed_vel_bins = neg_vel_bins
+        elif pos_vel_bins.size > 0:
+            self.zoomed_vel_bins = pos_vel_bins
+        else:
+            self.zoomed_vel_bins = np.array([])
+        
+        return self.zoomed_vel_bins
     
     def precise_doppler_azimuth_fft(
             self,
             adc_cube_range_fft:np.ndarray,
             shift_angle:bool = True,
-            vel_bound:float = 0.25
+            vel_range:np.ndarray = np.array([-0.25,0.25]),
     ):
         """Computes the precise (zoomFFT) Doppler-azimuth response from the range-FFT ADC cube.
             The input ADC cube is expected to be indexed as [rx, range, chirp], while the
@@ -159,7 +207,7 @@ class DopplerAzimuthProcessor(_Processor):
                 adc_cube_range_fft (np.ndarray): The range-FFT ADC cube with shape [num_rx, num_range_bins, num_chirps].
                     Note that this is the adc_cube after the range FFT has been applied
                 shift_angle (bool, optional): A flag to indicate whether to shift the angle axis. Defaults to True.
-                vel_bound (float, optional): The velocity bound for zoom FFT. Defaults to 0.25 m/s.
+                vel_range (np.ndarray, optional): Velocity range for the zoom FFT. Defaults to np.array([-0.25,0.25]).
             Returns:
                 np.ndarray: The Doppler-azimuth response with shape [num_range_bins, num_chirps, num_angle_bins].
             """
@@ -169,40 +217,60 @@ class DopplerAzimuthProcessor(_Processor):
         data = np.zeros((num_range_bins,num_chirps,self.num_angle_bins),dtype=complex)
         data[:,:,0:num_rx] = np.transpose(adc_cube_range_fft, (1,2,0))
 
-        num_vel_bins = int(self.vel_bins.shape[0] * 2)
-        self.zoomed_vel_bins = np.linspace(
-            start=-1 * vel_bound,
-            stop=vel_bound,
-            num= num_vel_bins
-        )
+        
+
+        # Ensure vel_range is within the valid velocity range
+        vel_range[0] = max(vel_range[0], -1 * self.config_manager.vel_max_m_s)
+        vel_range[1] = min(vel_range[1], self.config_manager.vel_max_m_s)
+
+        # Ensure that the bounds have a minimum spread
+        vel_spread = 2 * self.min_zoom_fft_vel_span
+        if (vel_range[1] - vel_range[0]) < vel_spread:
+            dist_to_max_bound = abs(vel_range[1] - self.config_manager.vel_max_m_s)
+            dist_to_min_bound = abs(vel_range[0] - (-1 * self.config_manager.vel_max_m_s))
+            if dist_to_max_bound > dist_to_min_bound:
+                vel_range[1] = vel_range[0] + vel_spread
+            elif dist_to_min_bound > dist_to_max_bound:
+                vel_range[0] = vel_range[1] - vel_spread
+
+        #configure the zoomed FFT velocity bins
+        self.set_zoomed_fft_vel_bins(vel_range)
 
         #compute negative velocity zoom FFT
         neg_vel_vals = self.zoomed_vel_bins[self.zoomed_vel_bins <= 0]
         num_samples = len(neg_vel_vals)
-        vel_range = np.array([
-            np.min(neg_vel_vals),
-            np.max(neg_vel_vals)
-        ]) + 2 * self.config_manager.vel_max_m_s
+        if num_samples > 0 and \
+            np.abs(max(neg_vel_vals) - min(neg_vel_vals)) > self.min_zoom_fft_vel_span:
+                vel_range = np.array([
+                    np.min(neg_vel_vals),
+                    np.max(neg_vel_vals)
+                ]) + 2 * self.config_manager.vel_max_m_s
 
-        neg_vel_zoom_result = self.zoom_fft(
-            adc_cube_range_fft_rearranged=data,
-            vel_range=vel_range,
-            num_samples=num_samples
-        )
+                neg_vel_zoom_result = self.zoom_fft(
+                    adc_cube_range_fft_rearranged=data,
+                    vel_range=vel_range,
+                    num_samples=num_samples
+                )
+        else:
+            neg_vel_zoom_result = np.zeros((num_range_bins,num_samples,self.num_angle_bins),dtype=float)
 
         #compute positive velocity zoom FFT
         pos_vel_vals = self.zoomed_vel_bins[self.zoomed_vel_bins > 0]
         num_samples = len(pos_vel_vals)
-        vel_range = np.array([
-            np.min(pos_vel_vals),
-            np.max(pos_vel_vals)
-        ])
+        if num_samples > 0 and\
+              np.abs(max(pos_vel_vals) - min(pos_vel_vals)) > self.min_zoom_fft_vel_span:
+                vel_range = np.array([
+                    np.min(pos_vel_vals),
+                    np.max(pos_vel_vals)
+                ])
 
-        pos_vel_zoom_result = self.zoom_fft(
-            adc_cube_range_fft_rearranged=data,
-            vel_range=vel_range,
-            num_samples=num_samples
-        )
+                pos_vel_zoom_result = self.zoom_fft(
+                    adc_cube_range_fft_rearranged=data,
+                    vel_range=vel_range,
+                    num_samples=num_samples
+                )
+        else:
+            pos_vel_zoom_result = np.zeros((num_range_bins,num_samples,self.num_angle_bins),dtype=float)
 
         #combine the negative and positive velocity zoom FFT results
         zoom_result = np.concatenate((neg_vel_zoom_result, pos_vel_zoom_result), axis=1)
@@ -253,13 +321,13 @@ class DopplerAzimuthProcessor(_Processor):
 
         return resp
     
-    def detect_peaks(
+    def detect_peaks_rows(
             self,
             doppler_azimuth_resp_mag: np.ndarray,
             vel_bins:np.ndarray,
             min_threshold_dB: float = 30.0,
             ):
-        """Detect peaks in the Doppler-azimuth response magnitude.
+        """Detect peaks in each row of Doppler-azimuth response (peaks in velocity bins).
         Args:
             doppler_azimuth_resp_mag (np.ndarray): Doppler-azimuth response magnitude.
             vel_bins (np.ndarray): Velocity bins corresponding to the Doppler dimension.
@@ -268,16 +336,16 @@ class DopplerAzimuthProcessor(_Processor):
             Tuple[np.ndarray]: An Nx2 array where each row contains the (angle (radians), velocity) of a detected peak.
         """
         
-        elevation_response_dB = 20 * np.log10(np.abs(doppler_azimuth_resp_mag))
-        thresholded_val = np.max(elevation_response_dB) - min_threshold_dB
-        idxs = elevation_response_dB <= thresholded_val
-        elevation_response_dB[idxs] = thresholded_val
+        doppler_azimuth_resp_dB = 20 * np.log10(np.abs(doppler_azimuth_resp_mag))
+        thresholded_val = np.max(doppler_azimuth_resp_dB) - min_threshold_dB
+        idxs = doppler_azimuth_resp_dB <= thresholded_val
+        doppler_azimuth_resp_dB[idxs] = thresholded_val
 
         # find the peak in each row of the elevation response
         peak_angles = []
         peak_vels = []
 
-        for ridx, row in enumerate(elevation_response_dB):
+        for ridx, row in enumerate(doppler_azimuth_resp_dB):
             peaks, _ = find_peaks(row)
             if peaks.size > 0:
                 # choose the peak with the highest amplitude
@@ -288,6 +356,36 @@ class DopplerAzimuthProcessor(_Processor):
         return np.stack(
             [np.array(peak_angles),np.array(peak_vels)],axis=1
         )
+    
+    def detect_peak_zero_az(
+            self,
+            doppler_azimuth_resp_mag: np.ndarray,
+            vel_bins:np.ndarray,
+            min_threshold_dB: float = 30.0,
+            ):
+        """Detect peaks at the zero azimuth bin (corresponding to vx).
+        Args:
+            doppler_azimuth_resp_mag (np.ndarray): Doppler-azimuth response magnitude.
+            vel_bins (np.ndarray): Velocity bins corresponding to the Doppler dimension.
+            min_threshold_dB (float, optional): Minimum threshold in dB. Defaults to 30.0.
+        Returns:
+            Tuple[np.ndarray]: An Nx2 array where each row contains the (angle (radians), velocity) of a detected peak.
+        """
+        
+        doppler_azimuth_resp_dB = 20 * np.log10(np.abs(doppler_azimuth_resp_mag))
+        thresholded_val = np.max(doppler_azimuth_resp_dB) - min_threshold_dB
+        idxs = doppler_azimuth_resp_dB <= thresholded_val
+        doppler_azimuth_resp_dB[idxs] = thresholded_val
+
+        #find the column of the zero azimuth bin
+        zero_az_col = np.argmin(np.abs(self.valid_angle_bins))
+        peaks,_ = find_peaks(doppler_azimuth_resp_dB[:,zero_az_col])
+        if peaks.size > 0:
+            # choose the peak with the highest amplitude
+            best = peaks[np.argmax(doppler_azimuth_resp_dB[peaks,zero_az_col])]
+            return np.array([0.0, vel_bins[best]])
+        else:
+            return np.empty(shape=(0,2))
         
         
 
@@ -298,7 +396,7 @@ class DopplerAzimuthProcessor(_Processor):
             range_window: np.ndarray = np.array([]),
             shift_angle:bool = True,
             use_precise_fft: bool = False,
-            precise_vel_bound: float = 0.25
+            precise_vel_range:np.ndarray = np.array([-0.25,0.25])
             ) -> np.ndarray:
         """Compute a doppler-azimuth response for the radar
 
@@ -308,7 +406,7 @@ class DopplerAzimuthProcessor(_Processor):
             range_window (np.ndarray): array of min and max range to keep indexed by [min_range,max_range]
             shift_angle (bool): shift the angle dimension to be centered at 0 when performing the 2D FFT
             use_precise_fft (bool): flag to indicate whether to use the precise (zoomFFT) Doppler-azimuth response
-            precise_vel_bound (float): velocity bound for the zoom FFT if use_precise_fft is True. Defaults to 0.25 m/s.
+            precise_vel_range (np.ndarray): velocity range for the zoom FFT when using precise FFT indexed by [min_vel,max_vel]
         Returns:
             np.ndarray: doppler-azimuth response indexed by [vel,angle]
             that is the average across all samples
@@ -335,7 +433,7 @@ class DopplerAzimuthProcessor(_Processor):
             resp = self.precise_doppler_azimuth_fft(
                 adc_cube_range_fft=adc_cube_range_fft,
                 shift_angle=shift_angle,
-                vel_bound=precise_vel_bound
+                vel_range=precise_vel_range
             )
 
         

@@ -380,6 +380,10 @@ class PlotterMmWaveData:
             fontsize=self.font_size_title
         )
         ax.tick_params(labelsize=self.font_size_ticks)
+        ax.set_ylim(
+            bottom=np.min(doppler_azimuth_processor.vel_bins),
+            top=np.max(doppler_azimuth_processor.vel_bins)
+        )
 
         # Optional colorbar
         # cbar = plt.colorbar(mesh, ax=ax)
@@ -479,6 +483,10 @@ class PlotterMmWaveData:
             fontsize=self.font_size_title
         )
         ax.tick_params(labelsize=self.font_size_ticks)
+        ax.set_ylim(
+            bottom=np.min(doppler_azimuth_processor.zoomed_vel_bins),
+            top=np.max(doppler_azimuth_processor.zoomed_vel_bins)
+        )
 
         # Optional colorbar
         # cbar = plt.colorbar(mesh, ax=ax)
