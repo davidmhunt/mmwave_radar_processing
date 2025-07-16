@@ -51,7 +51,7 @@ class RangeAngleProcessor(_Processor):
         self.x_s = np.multiply(self.rhos,np.cos(self.thetas))
         self.y_s = np.multiply(self.rhos,np.sin(self.thetas))
 
-    def process(self, adc_cube: np.ndarray, chirp_idx = 0) -> np.ndarray:
+    def process(self, adc_cube: np.ndarray, chirp_idx = 0, rx_antennas:np.ndarray = np.array([])) -> np.ndarray:
         """_summary_
 
         Args:
@@ -59,10 +59,17 @@ class RangeAngleProcessor(_Processor):
                 (num_chirps) adc data cube consisting of complex data
             chirp_idx (int, optional): The chirp to compute the response for.
               Defaults to 0.
+              rx_antennas (np.ndarray,optional): array of rx antenna indices to use
 
         Returns:
             np.ndarray: (range bins) x (angle bins) range azimuth response
         """
+
+        #screen for specific rx antennas if desired
+        if rx_antennas.size > 0:
+            adc_cube = adc_cube[rx_antennas, :, :]
+
+
         #initialize the data by zero padding the angle bins
         data = np.zeros(
             shape=(

@@ -6,6 +6,9 @@ from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProces
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
 from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerProcessor
+from mmwave_radar_processing.processors.range_resp import RangeProcessor
+from mmwave_radar_processing.processors.altimeter import Altimeter
+from mmwave_radar_processing.processors.velocity_estimator import VelocityEstimator
 
 
 class PlotterMmWaveData:
@@ -290,12 +293,27 @@ class PlotterMmWaveData:
         self,
         resp: np.ndarray,
         doppler_azimuth_processor: DopplerAzimuthProcessor,
+        peaks:np.ndarray = np.empty(shape=(0,2)),
+        vd_ground_truth:np.ndarray = np.empty(shape=(0)),
+        vd_estimated:np.ndarray = np.empty(shape=(0)),
         convert_to_dB=False,
         cmap="viridis",
         ax: plt.Axes = None,
         show=False
     ):
-        """Plot the Doppler-Azimuth response using a meshgrid for non-uniform bins."""
+        """Plot the Doppler-Azimuth response.
+
+        Args:
+            resp (np.ndarray): Doppler-azimuth response magnitude.
+            doppler_azimuth_processor (DopplerAzimuthProcessor): Processor used to generate the response.
+            peaks (np.ndarray, optional): Detected peaks in the response. Defaults to np.empty(shape=(0,2)).
+            vd_ground_truth (np.ndarray, optional): Ground truth velocity measurements at each valid angle based on the given ground truth velocity. Defaults to np.empty(shape=(0)).
+            vd_estimated (np.ndarray, optional): Estimated velocity measurements at each valid angle based on a LSQ-estimated ego velocity. Defaults to np.empty(shape=(0)).
+            convert_to_dB (bool, optional): Whether to convert the response to dB. Defaults to False.
+            cmap (str, optional): Colormap for the plot. Defaults to "viridis".
+            ax (plt.Axes, optional): Axes to plot on. Defaults to None.
+            show (bool, optional): Whether to display the plot. Defaults to False.
+        """
 
         if ax is None:
             fig, ax = plt.subplots()
@@ -308,7 +326,7 @@ class PlotterMmWaveData:
 
         # Get velocity and angle bins
         vel_bins = doppler_azimuth_processor.vel_bins
-        angle_bins = doppler_azimuth_processor.angle_bins
+        angle_bins = doppler_azimuth_processor.valid_angle_bins
 
         # Make 2D meshgrid
         angle_grid, vel_grid = np.meshgrid(angle_bins, vel_bins)
@@ -325,6 +343,36 @@ class PlotterMmWaveData:
             cmap=cmap
         )
 
+        if peaks.shape[0] > 0:
+            ax.scatter(
+                peaks[:, 0],
+                peaks[:, 1],
+                marker='x',
+                color='red',
+                label='Detected Peaks'
+            )
+            ax.legend()
+
+        if vd_ground_truth.shape[0] > 0:
+            ax.plot(
+                doppler_azimuth_processor.valid_angle_bins,
+                vd_ground_truth,
+                color='orange',
+                linewidth=2,
+                label='Ground Truth Velocity'
+            )
+            ax.legend()
+        
+        if vd_estimated.shape[0] > 0:
+            ax.plot(
+                doppler_azimuth_processor.valid_angle_bins,
+                vd_estimated,
+                color='white',
+                linewidth=2,
+                label='Estimated Velocity'
+            )
+            ax.legend()
+
         ax.set_ylabel("Velocity (m/s)", fontsize=self.font_size_axis_labels)
         ax.set_xlabel("Angle (radians)", fontsize=self.font_size_axis_labels)
         ax.set_title(
@@ -340,31 +388,126 @@ class PlotterMmWaveData:
         if show:
             plt.show()
 
-
-    def plot_doppler_az_resp_old(
+    def plot_zoomed_doppler_az_resp(
         self,
-        resp:np.ndarray,
-        doppler_azimuth_processor:DopplerAzimuthProcessor,
+        resp: np.ndarray,
+        doppler_azimuth_processor: DopplerAzimuthProcessor,
+        peaks:np.ndarray = np.empty(shape=(0,2)),
+        vd_ground_truth:np.ndarray = np.empty(shape=(0)),
+        vd_estimated:np.ndarray = np.empty(shape=(0)),
         convert_to_dB=False,
         cmap="viridis",
+        ax: plt.Axes = None,
+        show=False
+    ):
+        """Plot the zoomed Doppler-Azimuth response.
+
+        Args:
+            resp (np.ndarray): Zoomed Doppler-azimuth response magnitude.
+            doppler_azimuth_processor (DopplerAzimuthProcessor): Processor used to generate the response.
+            peaks (np.ndarray, optional): Detected peaks in the response. Defaults to np.empty(shape=(0,2)).
+            vd_ground_truth (np.ndarray, optional): Ground truth velocity measurements at each valid angle based on the given ground truth velocity. Defaults to np.empty(shape=(0)).
+            vd_estimated (np.ndarray, optional): Estimated velocity measurements at each valid angle based on a LSQ-estimated ego velocity. Defaults to np.empty(shape
+            convert_to_dB (bool, optional): Whether to convert the response to dB. Defaults to False.
+            cmap (str, optional): Colormap for the plot. Defaults to "viridis".
+            ax (plt.Axes, optional): Axes to plot on. Defaults to None.
+            show (bool, optional): Whether to display the plot. Defaults to False.
+        """
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        if convert_to_dB:
+            resp = 20 * np.log10(resp)
+            # Thresholding to remove very low values
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            resp = np.maximum(resp, thresholded_val)
+
+        # Get velocity and angle bins
+        angle_bins = doppler_azimuth_processor.valid_angle_bins
+
+        # Make 2D meshgrid
+        angle_grid, vel_grid = np.meshgrid(angle_bins, doppler_azimuth_processor.zoomed_vel_bins)
+
+        # Flip response vertically to match orientation
+        # resp_flipped = np.flip(resp, axis=0)
+
+        # Plot using pcolormesh
+        mesh = ax.pcolormesh(
+            angle_grid,
+            vel_grid,
+            resp,
+            shading='nearest',
+            cmap=cmap
+        )
+
+        if peaks.shape[0] > 0:
+            ax.scatter(
+                peaks[:, 0],
+                peaks[:, 1],
+                marker='x',
+                color='red',
+                label='Detected Peaks'
+            )
+            ax.legend()
+        
+        if vd_ground_truth.shape[0] > 0:
+            ax.plot(
+                doppler_azimuth_processor.valid_angle_bins,
+                vd_ground_truth,
+                color='orange',
+                linewidth=2,
+                label='Ground Truth Velocity'
+            )
+            ax.legend()
+        
+        if vd_estimated.shape[0] > 0:
+            ax.plot(
+                doppler_azimuth_processor.valid_angle_bins,
+                vd_estimated,
+                color='white',
+                linewidth=2,
+                label='Estimated Velocity'
+            )
+            ax.legend()
+
+        ax.set_ylabel("Velocity (m/s)", fontsize=self.font_size_axis_labels)
+        ax.set_xlabel("Angle (radians)", fontsize=self.font_size_axis_labels)
+        ax.set_title(
+            "Zoomed Doppler-Azimuth\nHeatmap (dB)" if convert_to_dB \
+                else "Zoomed Doppler-Azimuth\nHeatmap (mag)",
+            fontsize=self.font_size_title
+        )
+        ax.tick_params(labelsize=self.font_size_ticks)
+
+        # Optional colorbar
+        # cbar = plt.colorbar(mesh, ax=ax)
+        # cbar.set_label('Intensity', fontsize=12)
+
+        if show:
+            plt.show()
+
+    ####################################################################
+    #Altitude / Range FFT Response
+    ####################################################################
+    def plot_range_resp(
+        self,
+        resp:np.ndarray,
+        rng_bins:np.ndarray,
+        peak_rng_bins:np.ndarray = np.empty(shape=0),
+        peak_vals:np.ndarray = np.empty(shape=0),
+        convert_to_dB=False,
         ax:plt.Axes=None,
         show=False
         ):
-        """Plot the range doppler response
+        """Plot the altitude/range FFT response.
 
         Args:
-            resp (np.ndarray): range_bins x velocity bins np.ndarray of the already computed
-                range doppler response
-            doppler_azimuth_processor (DopplerAzimuthProcessor): RangeDopplerProcessor object
-                used to generate the response
-            convert_to_dB (bool, optional): on True, converts the response to a 
-                log scale. Defaults to False.
-            cmap (str, optional): the color map used for the generated plot
-                (gray is another option). Defaults to "viridis".
-            ax (plt.Axes, optional): the axes on which to display the plot.
-                If none provided, a figure is automatically generated.
-                Defaults to None.
-            show (bool, optional): On true, shows the plot. Defaults to False.
+            resp (np.ndarray): 1D array of the computed range/altitude FFT response.
+            range_processor (RangeProcessor): RangeProcessor object used to generate the response.
+            convert_to_dB (bool, optional): If True, converts the response to a log scale. Defaults to False.
+            ax (plt.Axes, optional): The axes on which to display the plot. If None, a figure is automatically generated. Defaults to None.
+            show (bool, optional): If True, shows the plot. Defaults to False.
         """
 
         if not ax:
@@ -372,34 +515,106 @@ class PlotterMmWaveData:
         
         if convert_to_dB:
             resp = 20 * np.log10(resp)
-            #remove anything below the min_threshold dB down
-            thresholded_val = np.max(resp) - self.min_threshold_dB
-            idxs = resp <= thresholded_val
-            resp[idxs] = thresholded_val
         
-        im = ax.imshow(
-            np.flip(resp,axis=0),
-            extent=[
-                doppler_azimuth_processor.angle_bins[0],
-                doppler_azimuth_processor.angle_bins[-1],
-                doppler_azimuth_processor.vel_bins[0],
-                doppler_azimuth_processor.vel_bins[-1],
-            ],
-            cmap=cmap,
-            aspect='auto',
-            interpolation='bilinear'
-            )
-        ax.set_ylabel("Velocity (m/s)",fontsize=self.font_size_axis_labels)
-        ax.set_xlabel("Angle (radians)",fontsize=self.font_size_axis_labels)
-        if convert_to_dB:
-            ax.set_title("Doppler-Aziuth\nHeatmap (dB)",fontsize=self.font_size_title)
-        else:
-            ax.set_title("Doppler-Azimuth\nHeatmap (mag)",fontsize=self.font_size_title)
-        ax.tick_params(labelsize=self.font_size_ticks)
+        ax.plot(rng_bins, resp, color='blue', linewidth=2, label='Range FFT Resp')
 
-        #add the colorbar
-        # cbar = plt.colorbar(im, ax=ax)
-        # cbar.set_label('Intensity', fontsize=12)
+        if peak_rng_bins.shape[0] > 0:
+            ax.plot(peak_rng_bins, peak_vals, 'ro', markersize=self.marker_size, label='Detected Peaks')
+        ax.set_xlabel("Range (m)",fontsize=self.font_size_axis_labels)
+
+        if convert_to_dB:
+            ax.set_ylabel("Amplitude (dB)",fontsize=self.font_size_axis_labels)
+            ax.set_title("Range FFT (dB)",fontsize=self.font_size_title)
+        else:
+            ax.set_ylabel("Amplitude (mag)",fontsize=self.font_size_axis_labels)
+            ax.set_title("Range FFT (mag)",fontsize=self.font_size_title)
+        
+        ax.tick_params(labelsize=self.font_size_ticks)
+        ax.grid(True)
+        ax.legend(fontsize=self.font_size_legend, loc='lower right')
+
+        if show:
+            plt.show()
+
+    ####################################################################
+    #Errors and Ground Truth Comparison
+    ####################################################################
+    def plot_estimated_vs_ground_truth(
+        self,
+        estimated:np.ndarray,
+        ground_truth:np.ndarray,
+        ax:plt.Axes=None,
+        value_label="Altitude (m)",
+        show=False
+        ):
+        """Plot the estimated value against the ground truth value
+
+        Args:
+            estimated (np.ndarray): 1D array of estimated values.
+            ground_truth (np.ndarray): 1D array of ground truth values.
+            ax (plt.Axes, optional): The axes on which to display the plot. If None, a figure is automatically generated. Defaults to None.
+            value_label (str, optional): Label for the y-axis. Defaults to "Altitude (m)".
+            show (bool, optional): If True, shows the plot. Defaults to False.
+        """
+
+        if not ax:
+            fig,ax = plt.subplots()
+    
+        #check to make sure that both arrays have data
+        if estimated.size > 0:
+            ax.plot(estimated, color='blue', linewidth=2, label='Estimated Value')
+        if ground_truth.size > 0:
+            ax.plot(ground_truth, color='orange', linewidth=2, label='Ground Truth Value')
+        
+        ax.set_xlabel("Frame index",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel(value_label,fontsize=self.font_size_axis_labels)
+        ax.set_title(f"Estimated {value_label}\nvs Ground Truth",fontsize=self.font_size_title)
+        
+        ax.tick_params(labelsize=self.font_size_ticks)
+        ax.grid(True)
+        ax.legend(fontsize=self.font_size_legend, loc='upper right')
+
+        if show:
+            plt.show()
+        
+    def plot_estimated_vs_ground_truth_error(
+        self,
+        estimated:np.ndarray,
+        ground_truth:np.ndarray,
+        ax:plt.Axes=None,
+        value_label="Altitude (m)",
+        show=False
+        ):
+        """Plot the error between the estimated value and the ground truth value.
+
+        Args:
+            estimated (np.ndarray): 1D array of estimated values.
+            ground_truth (np.ndarray): 1D array of ground truth values.
+            ax (plt.Axes, optional): The axes on which to display the plot. If None, a figure is automatically generated. Defaults to None.
+            value_label (str, optional): Label for the y-axis. Defaults to "Altitude (m)".
+            show (bool, optional): If True, shows the plot. Defaults to False.
+        """
+
+        if not ax:
+            fig,ax = plt.subplots()
+    
+        #check to make sure that both arrays have data
+        if estimated.size == 0 or ground_truth.size == 0:
+            return
+        # check to make sure arrays are same length
+        if estimated.shape[0] != ground_truth.shape[0]:
+            raise ValueError("Estimated and ground truth arrays must have the same length.")
+
+        error = estimated - ground_truth
+        ax.plot(error, color='blue', linewidth=2, label='Errors')
+
+        ax.set_xlabel("Frame index",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel(f"{value_label} error",fontsize=self.font_size_axis_labels)
+        ax.set_title(f"Estimated {value_label}\nvs Ground Truth",fontsize=self.font_size_title)
+        
+        ax.tick_params(labelsize=self.font_size_ticks)
+        ax.grid(True)
+        ax.legend(fontsize=self.font_size_legend, loc='upper right')
 
         if show:
             plt.show()
@@ -495,11 +710,27 @@ class PlotterMmWaveData:
                 show=False
             )
 
+
+        #determine the array goemetry
+        if self.config_manager.array_geometry == "standard":
+            if self.config_manager.virtual_antennas_enabled:
+                rx_antennas = np.array(range(8))
+            else:
+                rx_antennas = np.array(range(4))
+        elif self.config_manager.array_geometry == "ods":
+            if self.config_manager.virtual_antennas_enabled:
+                rx_antennas = np.array([10,11,6,7]) #only do the elevation
+            else:
+                rx_antennas = np.array([0,1])
+        else:
+            rx_antennas = np.array([]) #no rx antennas specified
+
         #plot the range azimuth plots
         if range_azimuth_processor:
             resp = range_azimuth_processor.process(
                 adc_cube=adc_cube,
-                chirp_idx=chirp_idx
+                chirp_idx=chirp_idx,
+                rx_antennas=rx_antennas
             )
             self.plot_range_az_resp_cart(
                 resp=resp,
@@ -536,7 +767,8 @@ class PlotterMmWaveData:
         #plot the doppler-azimuth response
         if doppler_azimuth_processor:
             resp = doppler_azimuth_processor.process(
-                adc_cube=adc_cube
+                adc_cube=adc_cube,
+                rx_antennas=rx_antennas
             )
             self.plot_doppler_az_resp(
                 resp=resp,
