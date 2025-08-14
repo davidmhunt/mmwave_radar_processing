@@ -107,7 +107,8 @@ class RangeProcessor(_Processor):
         self, 
         rng_resp_db: np.ndarray, 
         rng_bins: np.ndarray, 
-        max_peaks: int = 3) -> tuple[np.ndarray, np.ndarray]:
+        max_peaks: int = 3,
+        threshold_dB: int = 20) -> tuple[np.ndarray, np.ndarray]:
         """
         Find and filter the most significant peaks in the range response.
 
@@ -115,6 +116,7 @@ class RangeProcessor(_Processor):
             rng_resp_db (np.ndarray): Range response magnitude in dB
             rng_bins (np.ndarray): Array of range bin values in meters
             max_peaks (int, optional): Maximum number of peaks to return. Defaults to 3.
+            threshold_dB (int, optional): dB threshold to filter peaks relative to the maximum peak. Defaults to 20.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: Tuple containing:
@@ -130,7 +132,7 @@ class RangeProcessor(_Processor):
             # This helps eliminate noise and weak reflections
             peak_vals = rng_resp_db[peaks]
             max_peak = np.max(peak_vals)
-            within_20dB = peak_vals >= (max_peak - 20)
+            within_20dB = peak_vals >= (max_peak - threshold_dB)
             filtered_peaks = peaks[within_20dB]
             filtered_vals = peak_vals[within_20dB]
 
@@ -152,7 +154,7 @@ class RangeProcessor(_Processor):
 
     def process(self, adc_cube: np.ndarray, chirp_idx: int = 0) -> np.ndarray:
         """
-        Process the ADC cube to estimate the altitude (range to ground).
+        Process the ADC cube to obtain a coarse range response
 
         Args:
             adc_cube (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps)
@@ -160,11 +162,4 @@ class RangeProcessor(_Processor):
         Returns:
             np.ndarray: Magnitude of range FFT (range profile) for the selected RX channel.
         """
-        # Select the RX channel
-        rx_data = adc_cube[:, :, chirp_idx]
-        # Average across chirps for improved SNR
-        rx_data_mean = np.mean(rx_data, axis=1)
-        # Compute range FFT
-        range_fft = np.fft.fft(rx_data_mean, n=self.num_range_bins)
-        range_profile = np.abs(range_fft)
-        return range_profile 
+        return self.coarse_fft(adc_cube, chirp_idx)

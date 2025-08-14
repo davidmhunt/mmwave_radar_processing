@@ -94,6 +94,7 @@ class ConfigManager:
 
         #array geometry #whether or not using the ods array geometry
         self.array_geometry = "standard" #"standard" or "ods"
+        self.array_direction = "down" #"down" or "out"
 
         return
 
@@ -203,7 +204,12 @@ class ConfigManager:
     #loading the radar configuration
     ####################################################################
 
-    def load_cfg(self,cfg_file_path:str,array_geometry:str = "standard"):
+    def load_cfg(
+            self,
+            cfg_file_path:str,
+            array_geometry:str = "standard",
+            array_direction:str = "down"  # "down" or "out"
+            ):
         """Load a configuration
 
         Args:
@@ -211,9 +217,13 @@ class ConfigManager:
             array_geometry (str, optional): "standard" or "ods".
                 Specifies the array geometry of the radar. 
                 Defaults to "standard".
+            array_direction (str, optional): "down" or "out".
+                Specifies the direction of the array. 
+                Defaults to "down".
         """
 
         self.array_geometry = array_geometry
+        self.array_direction = array_direction
 
         f = open(cfg_file_path)
         for line in f:

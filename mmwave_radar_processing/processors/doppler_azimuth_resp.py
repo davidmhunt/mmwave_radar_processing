@@ -79,7 +79,7 @@ class DopplerAzimuthProcessor(_Processor):
         self.valid_angle_bins = self.angle_bins[self.valid_angle_mask]
 
     
-    def apply_range_vel_hanning_window(self,
+    def apply_hanning_windows(self,
             adc_cube: np.ndarray):
         
         #rangeFFT - apply hanning window
@@ -89,6 +89,11 @@ class DopplerAzimuthProcessor(_Processor):
         #apply hanning window across chirps
         hanning_window_chirp = np.hanning(adc_cube.shape[2])
         adc_cube_windowed = adc_cube_windowed * hanning_window_chirp[np.newaxis, np.newaxis, :]
+
+        if self.config_manager.array_geometry == "standard" and self.config_manager.virtual_antennas_enabled:
+            #additionally apply an angular hanning window
+            hanning_window_angle = np.hanning(adc_cube.shape[0])
+            adc_cube_windowed = adc_cube_windowed * hanning_window_angle[:, np.newaxis, np.newaxis]
 
         return adc_cube_windowed
     
@@ -111,8 +116,8 @@ class DopplerAzimuthProcessor(_Processor):
             range_window = np.array([0, self.config_manager.range_max_m])
 
         #rangeFFT - compute along the sample dimension
-        #now indexed by [rx,range,chirp]
         adc_cube_range_fft = np.fft.fft(adc_cube, axis=1)
+        #now indexed by [rx,range,chirp]
 
         #filter the response to the specified range window
         mask = (self.range_bins >= range_window[0]) & (self.range_bins <= range_window[1])
@@ -144,7 +149,7 @@ class DopplerAzimuthProcessor(_Processor):
         freq_stop = vel_range[1] * fs / self.config_manager.vel_max_m_s
         
         #TODO: Figure out why the factor of 2 is needed here
-        zoom = ZoomFFT(num_samples, [freq_start, freq_stop], fs=fs * 2)
+        zoom = ZoomFFT(num_samples, [freq_start, freq_stop], fs=fs * 2) #fs * 2 for 10 Hz
 
         #modify size to adjust for number of samples
         adc_cube_range_fft_rearranged =\
@@ -164,11 +169,16 @@ class DopplerAzimuthProcessor(_Processor):
             np.ndarray: The velocity bins for the zoomed FFT.
         """
 
+
+        #determine the number of velocity bins
+        num_vel_bins = self.vel_bins.size
+
+
         # Generate 100 velocity bins less than or equal to zero
         neg_vel_bins = np.linspace(
             start=vel_range[0],
             stop=min(-1e-4, vel_range[1]),
-            num=100 if vel_range[0] <= 0 else 0,
+            num=num_vel_bins if vel_range[0] <= 0 else 0,
             endpoint=False
         )
 
@@ -176,7 +186,7 @@ class DopplerAzimuthProcessor(_Processor):
         pos_vel_bins = np.linspace(
             start=max(1e-4, vel_range[0]),
             stop=vel_range[1],
-            num=100 if vel_range[1] > 0 else 0,
+            num=num_vel_bins if vel_range[1] > 0 else 0,
             endpoint=False
         )
 
@@ -336,7 +346,8 @@ class DopplerAzimuthProcessor(_Processor):
             Tuple[np.ndarray]: An Nx2 array where each row contains the (angle (radians), velocity) of a detected peak.
         """
         
-        doppler_azimuth_resp_dB = 20 * np.log10(np.abs(doppler_azimuth_resp_mag))
+        # add a small constant to avoid log of zero
+        doppler_azimuth_resp_dB = 20 * np.log10(np.abs(doppler_azimuth_resp_mag) + 1e-12)
         thresholded_val = np.max(doppler_azimuth_resp_dB) - min_threshold_dB
         idxs = doppler_azimuth_resp_dB <= thresholded_val
         doppler_azimuth_resp_dB[idxs] = thresholded_val
@@ -345,17 +356,31 @@ class DopplerAzimuthProcessor(_Processor):
         peak_angles = []
         peak_vels = []
 
+        # for ridx, row in enumerate(doppler_azimuth_resp_dB):
+        #     peaks, _ = find_peaks(row)
+        #     if peaks.size > 0:
+        #         # choose the peak with the highest amplitude
+        #         best = peaks[np.argmax(row[peaks])]
+        #         peak_angles.append(self.valid_angle_bins[best])
+        #         peak_vels.append(vel_bins[ridx])
+        
+
         for ridx, row in enumerate(doppler_azimuth_resp_dB):
-            peaks, _ = find_peaks(row)
+            peaks, properties = find_peaks(row, prominence=4.0)  # Only consider peaks with at least 4 dB prominence
             if peaks.size > 0:
                 # choose the peak with the highest amplitude
+                # peak_angles.extend(self.valid_angle_bins[peaks])
+                # peak_vels.extend([vel_bins[ridx]] * len(peaks))
+
+                #original code:
                 best = peaks[np.argmax(row[peaks])]
                 peak_angles.append(self.valid_angle_bins[best])
                 peak_vels.append(vel_bins[ridx])
-        
+
         return np.stack(
             [np.array(peak_angles),np.array(peak_vels)],axis=1
         )
+        
     
     def detect_peak_zero_az(
             self,
@@ -372,7 +397,7 @@ class DopplerAzimuthProcessor(_Processor):
             Tuple[np.ndarray]: An Nx2 array where each row contains the (angle (radians), velocity) of a detected peak.
         """
         
-        doppler_azimuth_resp_dB = 20 * np.log10(np.abs(doppler_azimuth_resp_mag))
+        doppler_azimuth_resp_dB = 20 * np.log10(np.abs(doppler_azimuth_resp_mag) + 1e-12)
         thresholded_val = np.max(doppler_azimuth_resp_dB) - min_threshold_dB
         idxs = doppler_azimuth_resp_dB <= thresholded_val
         doppler_azimuth_resp_dB[idxs] = thresholded_val
@@ -417,7 +442,7 @@ class DopplerAzimuthProcessor(_Processor):
             adc_cube = adc_cube[rx_antennas, :, :]
 
         #Apply windows to avoid spectral leakage
-        adc_cube_windowed = self.apply_range_vel_hanning_window(adc_cube)
+        adc_cube_windowed = self.apply_hanning_windows(adc_cube)
 
         #apply range FFT and filter to the specified range window
         adc_cube_range_fft = self.range_fft_and_filter(

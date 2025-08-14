@@ -140,6 +140,9 @@ class PlotterOdometryData(PlotterMmWaveData):
             self.plot_doppler_az_resp(
                 resp=velocity_estimator.azimuth_response_mag,
                 doppler_azimuth_processor=velocity_estimator,
+                peaks=velocity_estimator.azimuth_peaks,
+                vd_ground_truth=velocity_estimator.get_gt_velocity_measurement_predictions(direction="azimuth"),
+                vd_estimated=velocity_estimator.get_estimated_velocity_measurement_predictions(direction="azimuth"),
                 convert_to_dB=convert_to_dB,
                 cmap=cmap,
                 ax=axs[1,0],
@@ -147,14 +150,18 @@ class PlotterOdometryData(PlotterMmWaveData):
             )
             axs[1,0].set_title("Doppler-Azimuth\nHeatmap", fontsize=self.font_size_title)
 
-            self.plot_doppler_az_resp(
-                resp=velocity_estimator.elevation_response_mag,
-                doppler_azimuth_processor=velocity_estimator,
-                convert_to_dB=convert_to_dB,
-                cmap=cmap,
-                ax=axs[1,1],
-                show=False
-            )
+            if velocity_estimator.config_manager.array_geometry == "ods":
+                self.plot_doppler_az_resp(
+                    resp=velocity_estimator.elevation_response_mag,
+                    doppler_azimuth_processor=velocity_estimator,
+                    peaks=velocity_estimator.elevation_peaks,
+                    vd_ground_truth=velocity_estimator.get_gt_velocity_measurement_predictions(direction="elevation"),
+                    vd_estimated=velocity_estimator.get_estimated_velocity_measurement_predictions(direction="elevation"),
+                    convert_to_dB=convert_to_dB,
+                    cmap=cmap,
+                    ax=axs[1,1],
+                    show=False
+                )
             axs[1,1].set_title("Doppler-Elevation\nHeatmap", fontsize=self.font_size_title)
 
             self.plot_zoomed_doppler_az_resp(
@@ -170,28 +177,37 @@ class PlotterOdometryData(PlotterMmWaveData):
             )
             axs[2,0].set_title("Zoomed Doppler-Azimuth\nHeatmap", fontsize=self.font_size_title)
 
-            self.plot_zoomed_doppler_az_resp(
-                resp=velocity_estimator.precise_elevation_response_mag,
-                doppler_azimuth_processor=velocity_estimator,
-                peaks=velocity_estimator.elevation_peaks,
-                vd_ground_truth=velocity_estimator.get_gt_velocity_measurement_predictions(direction="elevation"),
-                vd_estimated=velocity_estimator.get_estimated_velocity_measurement_predictions(direction="elevation"),
-                convert_to_dB=convert_to_dB,
-                cmap=cmap,
-                ax=axs[2,1],
-                show=False
-            )
+            if velocity_estimator.config_manager.array_geometry == "ods":
+                self.plot_zoomed_doppler_az_resp(
+                    resp=velocity_estimator.precise_elevation_response_mag,
+                    doppler_azimuth_processor=velocity_estimator,
+                    peaks=velocity_estimator.elevation_peaks,
+                    vd_ground_truth=velocity_estimator.get_gt_velocity_measurement_predictions(direction="elevation"),
+                    vd_estimated=velocity_estimator.get_estimated_velocity_measurement_predictions(direction="elevation"),
+                    convert_to_dB=convert_to_dB,
+                    cmap=cmap,
+                    ax=axs[2,1],
+                    show=False
+                )
             axs[2,1].set_title("Zoomed Doppler-Elevation\nHeatmap", fontsize=self.font_size_title)
 
             if len(velocity_estimator.history_gt) > 0:
                 latest_gt_vel = velocity_estimator.history_gt[-1]
-                latest_est_vel = velocity_estimator.estimated_velocity
+                latest_est_vel = velocity_estimator.current_velocity_estimate
                 #TODO: These need to be flipped, but I don't know why
-                axs[1,0].set_title(f"Doppler-Azimuth (x)\nHeatmap (GT:{latest_gt_vel[1]:.2f})", fontsize=self.font_size_title)
-                axs[1,1].set_title(f"Doppler-Elevation (y)\nHeatmap (GT:{latest_gt_vel[0]:.2f})", fontsize=self.font_size_title)
 
-                axs[2,0].set_title(f"Zoomed Doppler-Azimuth (x)\nHeatmap (GT:{latest_gt_vel[1]:.2f}, EST:{latest_est_vel[0]:.2f})", fontsize=self.font_size_title)
-                axs[2,1].set_title(f"Zoomed Doppler-Elevation (y)\nHeatmap (GT:{latest_gt_vel[0]:.2f}, EST:{latest_est_vel[1]:.2f})", fontsize=self.font_size_title)
+                if self.config_manager.array_geometry == "ods":
+                    axs[1,0].set_title(f"Doppler-Azimuth (x)\nHeatmap (GT:{latest_gt_vel[1]:.2f})", fontsize=self.font_size_title)
+                    axs[1,1].set_title(f"Doppler-Elevation (y)\nHeatmap (GT:{latest_gt_vel[0]:.2f})", fontsize=self.font_size_title)
+
+                    axs[2,0].set_title(f"Zoomed Doppler-Azimuth (x)\nHeatmap (GT:{latest_gt_vel[1]:.2f}, EST:{latest_est_vel[0]:.2f})", fontsize=self.font_size_title)
+                    axs[2,1].set_title(f"Zoomed Doppler-Elevation (y)\nHeatmap (GT:{latest_gt_vel[0]:.2f}, EST:{latest_est_vel[1]:.2f})", fontsize=self.font_size_title)
+                else:
+                    axs[1,0].set_title(f"Doppler-Azimuth (x)\nHeatmap (GT:{latest_gt_vel[0]:.2f})", fontsize=self.font_size_title)
+                    axs[1,1].set_title(f"Doppler-Elevation (y)\nHeatmap (GT:{latest_gt_vel[1]:.2f})", fontsize=self.font_size_title)
+
+                    axs[2,0].set_title(f"Zoomed Doppler-Azimuth (x)\nHeatmap (GT:{latest_gt_vel[0]:.2f}, EST:{latest_est_vel[0]:.2f})", fontsize=self.font_size_title)
+                    axs[2,1].set_title(f"Zoomed Doppler-Elevation (y)\nHeatmap (GT:{latest_gt_vel[1]:.2f}, EST:{latest_est_vel[1]:.2f})", fontsize=self.font_size_title)
 
         if show:
             plt.show()

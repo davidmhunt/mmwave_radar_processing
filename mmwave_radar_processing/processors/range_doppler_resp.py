@@ -32,9 +32,23 @@ class RangeDopplerProcessor(_Processor):
             start=0,
             step=self.config_manager.range_res_m,
             stop=self.config_manager.range_max_m - self.config_manager.range_res_m/2)
+    
+    def apply_range_vel_hanning_window(self,
+            adc_cube: np.ndarray):
+        
+        #rangeFFT - apply hanning window
+        hanning_window_range = np.hanning(adc_cube.shape[1])
+        adc_cube_windowed = adc_cube * hanning_window_range[np.newaxis, :, np.newaxis]
+
+        #velocity FFT - apply hanning window
+        hanning_window_vel = np.hanning(adc_cube.shape[2])
+        adc_cube_windowed = adc_cube_windowed * hanning_window_vel[np.newaxis, np.newaxis, :]
+
+        return adc_cube_windowed
 
     def process(self, adc_cube: np.ndarray, rx_idx = 0) -> np.ndarray:
 
+        adc_cube = self.apply_range_vel_hanning_window(adc_cube)
 
         data = adc_cube[rx_idx,:,:]
 

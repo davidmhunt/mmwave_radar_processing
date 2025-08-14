@@ -50,6 +50,19 @@ class RangeAngleProcessor(_Processor):
         self.thetas,self.rhos = np.meshgrid(self.angle_bins,self.range_bins)
         self.x_s = np.multiply(self.rhos,np.cos(self.thetas))
         self.y_s = np.multiply(self.rhos,np.sin(self.thetas))
+    
+    def apply_range_angle_hanning_window(self,
+            adc_cube: np.ndarray):
+        
+        #rangeFFT - apply hanning window
+        hanning_window_range = np.hanning(adc_cube.shape[1])
+        adc_cube_windowed = adc_cube * hanning_window_range[np.newaxis, :, np.newaxis]
+
+        #Azimuth FFT - apply hanning window
+        hanning_window_angle = np.hanning(adc_cube.shape[0])
+        adc_cube_windowed = adc_cube_windowed * hanning_window_angle[:, np.newaxis, np.newaxis]
+
+        return adc_cube_windowed
 
     def process(self, adc_cube: np.ndarray, chirp_idx = 0, rx_antennas:np.ndarray = np.array([])) -> np.ndarray:
         """_summary_
@@ -64,6 +77,9 @@ class RangeAngleProcessor(_Processor):
         Returns:
             np.ndarray: (range bins) x (angle bins) range azimuth response
         """
+
+        #apply range hanning window
+        adc_cube = self.apply_range_angle_hanning_window(adc_cube)
 
         #screen for specific rx antennas if desired
         if rx_antennas.size > 0:

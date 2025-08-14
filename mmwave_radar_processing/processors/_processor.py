@@ -43,9 +43,9 @@ class _Processor:
             ground_truth (np.ndarray): 1D array of ground truth values.
         """
         if estimated.size > 0:
-            self.history_estimated.append(estimated)
+            self.history_estimated.append(estimated.copy())
         if ground_truth.size > 0:
-            self.history_gt.append(ground_truth)
+            self.history_gt.append(ground_truth.copy())
 
     def process(self,adc_cube:np.ndarray) -> np.ndarray:
         """Function implemented by child class to process an ADC cube to obtain a desired response
