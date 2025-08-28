@@ -13,20 +13,14 @@ class SyntheticArrayBeamformerProcessor(_Processor):
     def __init__(
             self,
             config_manager: ConfigManager,
-            # cfar:CaCFAR_1D,  # Commented out CFAR parameter
             az_angle_bins_rad=\
                 np.deg2rad(np.linspace(
                     start=-30,stop=30,num=60
                  )),
-            el_angle_bins_rad=\
-                np.deg2rad(np.linspace(
-                    start=-30,
-                    stop=30,
-                    num=30
-                )),
+            el_angle_bins_rad=np.array([0]),
             min_vel=0.2,
             max_vel_change=0.1,
-            mode:int = ENDFIRE_MODE) -> None:
+            mode:int = BROADSIDE_MODE) -> None:
         """_summary_
 
         Args:

@@ -194,8 +194,8 @@ class PlotterSyntheticArrayData:
                     )
                 )
             ax.set_xlim(
-                right=-1 * self.processor_SABF.lambda_m/8,
-                left = self.processor_SABF.p_y_m[-1,1] + \
+                left=np.min(self.processor_SABF.p_y_m[-1,:]) + -1 * self.processor_SABF.lambda_m/8,
+                right = np.max(self.processor_SABF.p_y_m[-1,:]) + \
                     self.processor_SABF.lambda_m/8
             )
 

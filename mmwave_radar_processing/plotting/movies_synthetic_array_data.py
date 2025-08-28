@@ -31,7 +31,10 @@ class MovieGeneratorSyntheticArrayData(MovieGenerator):
         adc_cube = self.dataset.get_radar_data(idx)
 
         #get the lidar pc
-        lidar_pc_raw = self.dataset.get_lidar_point_cloud_raw(idx)
+        try:
+            lidar_pc_raw = self.dataset.get_lidar_point_cloud_raw(idx)
+        except AssertionError:
+            lidar_pc_raw = np.empty(shape=(0))
 
         #get the camera data
         try:
