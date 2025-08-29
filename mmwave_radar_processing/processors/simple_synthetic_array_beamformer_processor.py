@@ -166,30 +166,6 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         all_chirp_start_times_us = np.arange(self.chirps_per_frame) * self.chirp_period_us
         self.chirp_start_times_us = all_chirp_start_times_us[self.valid_chirps_mask]
 
-        # chirp_cfg_tx_masks = np.array(
-        #     [self.config_manager.chirp_cfgs[idx]["txMask"] \
-        #      for idx in chirp_cfg_idxs]
-        # )
-
-        # self.chirp_tx_masks = np.tile(
-        #     A=chirp_cfg_tx_masks,
-        #     reps=self.config_manager.frameCfg_loops
-        # )
-
-        #compute the position of each element (y axis)
-        # rx_coordinates = np.array([
-        #     np.arange(self.config_manager.num_rx_antennas) * \
-        #           self.lambda_m/2
-        # ]).T
-        # self.chirp_rx_positions_m = np.tile(
-        #     A=rx_coordinates,
-        #     reps=(1,self.chirps_per_frame)
-        # )
-        # self.chirp_rx_positions_m[:,self.chirp_tx_masks == 2] += \
-        #       self.lambda_m
-        # self.chirp_rx_positions_m[:,self.chirp_tx_masks == 4] +=\
-        #       self.lambda_m * 2
-
         return
     
     def _compute_mesh_grids(self):
