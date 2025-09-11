@@ -1,5 +1,7 @@
 import numpy as np
 import scipy.constants as constants
+from scipy.signal import find_peaks
+
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
@@ -21,7 +23,9 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             el_angle_bins_rad=np.array([0]),
             min_vel:np.ndarray=np.array([0.17,0.0,0.0]),
             max_vel:np.ndarray=np.array([0.25,0.05,0.05]),
-            max_vel_stdev:np.ndarray=np.array([0.1,0.1,0.1]),) -> None:
+            max_vel_stdev:np.ndarray=np.array([0.1,0.1,0.1]),
+            enable_calibration:bool = False,
+            num_calibration_iters:int = 1) -> None:
         """Initialize the SyntheticArrayBeamformerProcessor.
 
         Args:
@@ -43,7 +47,8 @@ class SyntheticArrayBeamformerProcessor(_Processor):
                 [x, y, z] to allow for valid processing. Defaults to np.array([0.25, 0.05, 0.05]).
             max_vel_stdev (np.ndarray, optional): Maximum velocity standard deviation in the radar 
                 coordinate frame [x, y, z] to allow for valid processing. Defaults to np.array([0.1, 0.1, 0.1]).
-
+            enable_calibration (bool, optional): Flag to enable array calibration using targets of opportunity. Defaults to False.
+            num_calibration_iters (int, optional): Number of iterations for calibration. Defaults to 1.
         Notes:
             NOTE: Coordinate frames are defined as (x - forward, y - left, z - up).
             NOTE: Frames are indexed such that idx=-1 is the most recent frame.
@@ -79,15 +84,10 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             ),dtype=float) #indexed by [frame,(x,y,z)]
         
         self.history_acd_cube_valid_chirps:np.ndarray = None #indexed by [frame, sample, chirp]
-        
 
-        #computing the array geometry
-        # self.p_x_m:np.ndarray = None #indexed by [chirp]
-        # self.p_y_m:np.ndarray = None #indexed by [chirp]
-        # self.p_z_m:np.ndarray = None #indexed by [chirp]
-
-        self.p:np.ndarray = np.empty(shape=0) #indexed by [frame,(x,y,z),chirp]
-        # self.p_reshaped:np.ndarray = None #reshaped for efficient computation
+        #array geometry
+        self.array_geometry:np.ndarray = np.empty(shape=0) #indexed by [frame,(x,y,z),chirp]
+        self.array_geometry_calibrated:np.ndarray = np.empty(shape=0) #indexed by [frame,(x,y,z),chirp] after calibration
 
         #compute the beam pointing vectors
         self.az_angle_bins_rad = az_angle_bins_rad
@@ -111,6 +111,10 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         self.min_vel:np.array = min_vel
         self.max_vel:np.array = max_vel
         self.max_vel_stdev:np.array = max_vel_stdev
+
+        #calibration parameters
+        self.enable_calibration = enable_calibration
+        self.num_calibration_iters = num_calibration_iters
 
         #flag for tracking if the response is valid or not
         self.array_geometry_valid = False
@@ -226,7 +230,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
 
         return
 
-    def _update_vel_history(
+    def _update_vel_history_previous(
             self,
             current_vel:np.ndarray=np.array([0,0,0])
     ):  
@@ -269,6 +273,51 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             self.array_geometry_valid = True
         else:
             self.array_geometry_valid = False
+
+        return self.array_geometry_valid
+    
+    def _update_vel_history(
+            self,
+            current_vel: np.ndarray = np.array([0, 0, 0])
+    ) -> bool:
+        """
+        Updates the velocity history and checks if the UAV is maintaining a consistent flight trajectory.
+
+        Consistency is defined as:
+            - All velocities in history are within min/max bounds.
+            - Standard deviation of velocities is below threshold.
+            - (Optional) Direction of travel is consistent.
+
+        Args:
+            current_vel (np.ndarray, optional): The current velocity vector as a NumPy array 
+                with shape (3,). Defaults to np.array([0, 0, 0]).
+
+        Returns:
+            bool: True if the array geometry is valid (consistent trajectory), False otherwise.
+        """
+
+        # Shift history and insert current velocity
+        self.history_avg_vel[0:-1, :] = self.history_avg_vel[1:, :]
+        self.history_avg_vel[-1, :] = current_vel
+
+        # Check all velocities are within bounds
+        within_bounds = np.all(
+            (self.min_vel <= np.abs(self.history_avg_vel)) &
+            (np.abs(self.history_avg_vel) <= self.max_vel)
+        )
+
+        # Compute statistics
+        vel_stdev = np.std(self.history_avg_vel, axis=0)
+        stdev_ok = np.all(vel_stdev <= self.max_vel_stdev)
+
+        # Optional: Check direction consistency (cosine similarity)
+        directions = self.history_avg_vel / (np.linalg.norm(self.history_avg_vel, axis=1, keepdims=True) + 1e-6)
+        dot_products = np.dot(directions, directions.T)
+        # Only check off-diagonal elements
+        direction_consistency = np.all(dot_products > 0.95)  # e.g., >0.95 means <~18deg difference
+
+        # Combine all checks
+        self.array_geometry_valid = within_bounds and stdev_ok and direction_consistency
 
         return self.array_geometry_valid
 
@@ -345,8 +394,8 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         self._update_vel_history(current_vel=current_vel)
 
         #TODO: Make this condutional on if the array geometry is valid or not
-        if self.p.shape[0] == 0:
-            self.p = np.zeros(
+        if self.array_geometry.shape[0] == 0:
+            self.array_geometry = np.zeros(
                 shape=(
                     self.num_frames,
                     3, #x,y,z
@@ -364,7 +413,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             )
 
 
-            self.p[frame_idx, :, :] = frame_p
+            self.array_geometry[frame_idx, :, :] = frame_p
 
             current_frame_start_pose = frame_end_pose
         
@@ -423,14 +472,6 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             by [(x,y,z), chirp] at a specific receiver IDX
         """
 
-        #reshape the adc cube further
-        # adc_cube = np.reshape(
-        #                     adc_cube,
-        #                     (adc_cube.shape[0],-1),
-        #                     order="F"
-        #                 )
-
-
         #compute the phase shift to apply to each received signal
         shifts = np.exp(
                     1j * 2 * np.pi * \
@@ -447,6 +488,255 @@ class SyntheticArrayBeamformerProcessor(_Processor):
 
         #compute the response
         return np.fft.fft(beamformed_resp * window)
+    
+
+    def compute_synthetic_response(self,array_geometry) -> np.ndarray:
+        """Compute the synthetic response for the beamformer.
+
+        Args:
+            array_geometry (np.ndarray): the array geometry indexed by
+                [frame,(x,y,z), chirp] at a specific receiver IDX
+                (obtained from array geometry vector)
+
+        Returns:
+            np.ndarray: The synthetic beamformed response indexed by 
+            [range_bin, azimuth_angle, elevation_angle].
+        """
+        #reshape the adc_cube
+        adc_cube_reshaped = \
+            self.history_acd_cube_valid_chirps.transpose((1,0,2)).reshape(
+                self.history_acd_cube_valid_chirps.shape[1], #number of samples per chirp
+                -1
+            )
+        
+        #reshpae the array geometry
+        array_geometry_reshaped = \
+            array_geometry.transpose((1,0,2)).reshape(3,-1)
+
+        # Apply a Hanning window across each column of the adc cube
+        hamming_window = np.hamming(adc_cube_reshaped.shape[1]).reshape(1, -1)
+        adc_cube_reshaped = adc_cube_reshaped * hamming_window
+
+        for az_angle_idx in range(self.az_angle_bins_rad.shape[0]):
+                for el_angle_idx in range(self.el_angle_bins_rad.shape[0]):
+
+                    steering_vector = self.d[:,az_angle_idx,el_angle_idx]
+
+                    # Get beamformed response at the steering angle
+                    resp = self.compute_response_at_steering_angle(
+                        adc_cube=adc_cube_reshaped,
+                        array_geometry=array_geometry_reshaped,
+                        steering_vector=steering_vector
+                    )
+
+                    # Save the response
+                    self.beamformed_resp[:,az_angle_idx,el_angle_idx] = resp
+
+        return self.beamformed_resp
+
+    def compute_array_factor_at_angle(
+            self,
+            array_geometry: np.ndarray,
+            steering_vector: np.ndarray
+    ) -> complex:
+        """
+        Compute the array factor (beam response) at a steering direction,
+        assuming unit signals at all elements (no measured adc_cube).
+
+        Args:
+            array_geometry (np.ndarray): shape (3, N), synthetic element positions
+            steering_vector (np.ndarray): shape (3,), unit direction vector
+
+        Returns:
+            float: normalized array factor magnitude
+        """
+        # phase shift for each element
+        shifts = np.exp(
+            1j * 2 * np.pi * (steering_vector @ array_geometry) / self.lambda_m
+        )
+
+        # instead of multiplying with adc_cube, assume unity signal at each element
+        resp = np.sum(shifts)
+
+        return resp
+    
+    def compute_synthetic_array_pattern(self, array_geometry: np.ndarray) -> np.ndarray:
+        """
+        Compute synthetic array pattern (beam pattern) over az/el space.
+
+        Args:
+            array_geometry (np.ndarray): shape (3, num_chirps*num_frames)
+
+        Returns:
+            np.ndarray: beam pattern [azimuth, elevation]
+        """
+        array_geometry_reshaped = array_geometry.transpose((1,0,2)).reshape(3, -1)
+
+        pattern = np.zeros((self.az_angle_bins_rad.shape[0],
+                            self.el_angle_bins_rad.shape[0]), dtype=np.float32)
+
+        for az_angle_idx in range(self.az_angle_bins_rad.shape[0]):
+            for el_angle_idx in range(self.el_angle_bins_rad.shape[0]):
+                steering_vector = self.d[:, az_angle_idx, el_angle_idx]
+
+                resp = self.compute_array_factor_at_angle(
+                    array_geometry=array_geometry_reshaped,
+                    steering_vector=steering_vector
+                )
+
+                pattern[az_angle_idx, el_angle_idx] = np.abs(resp)
+
+        # normalize
+        pattern /= np.max(pattern)
+
+        return pattern
+
+
+    
+    def _prepare_calibration_data(self):
+        """
+        Reshapes ADC data and array geometry, and computes range FFTs.
+        
+        Returns:
+            tuple: A tuple containing:
+                - adc_cube_reshaped (np.ndarray): Reshaped ADC data.
+                - array_geometry_reshaped (np.ndarray): Reshaped array geometry.
+                - freq_resps (np.ndarray): Frequency responses from range FFTs.
+        """
+        adc_cube_reshaped = self.history_acd_cube_valid_chirps.transpose((1, 0, 2)).reshape(
+            self.history_acd_cube_valid_chirps.shape[1], -1
+        )
+        array_geometry_reshaped = self.array_geometry.transpose((1, 0, 2)).reshape(3, -1)
+
+        window = np.hamming(adc_cube_reshaped.shape[1]).reshape(1, -1)
+        windowed_signal = window * adc_cube_reshaped
+        freq_resps = np.fft.fft(windowed_signal, axis=0)
+
+        return adc_cube_reshaped, array_geometry_reshaped, freq_resps
+
+    def _find_calibration_targets(self, freq_resps, num_targets=3):
+        """
+        Finds strong targets in the range-azimuth response to use for calibration.
+
+        Args:
+            freq_resps (np.ndarray): Frequency responses from range FFTs.
+            num_targets (int): The number of targets to find.
+
+        Returns:
+            list: A list of tuples, where each tuple contains (range_index, azimuth_index) for a target.
+        """
+        avg_resp = np.mean(20 * np.log10(np.abs(freq_resps)), axis=1)
+        peak_indices, _ = find_peaks(avg_resp, height=0)
+        peak_values = avg_resp[peak_indices]
+        sorted_rng_peak_idxs = peak_indices[np.argsort(peak_values)[-num_targets:][::-1]]
+
+        targets = []
+        for i in range(num_targets):
+            rng_idx = sorted_rng_peak_idxs[i]
+            freq_resp_at_rng = 10 * np.log10(np.abs(self.beamformed_resp[rng_idx, :, 0]))
+            
+            #TODO: Add code here to try and identify strong single reflectors
+
+            peaks, _ = find_peaks(np.abs(freq_resp_at_rng), height=0)
+            if len(peaks) == 0:
+                continue
+
+            peak_values_az = np.abs(freq_resp_at_rng)[peaks]
+            az_peak_idx = peaks[np.argmax(peak_values_az)]
+            targets.append((rng_idx, az_peak_idx))
+        
+        return targets
+
+    def _get_phase_diffs_for_target(self, target, freq_resps, array_geometry_reshaped):
+        """
+        Computes the phase differences for a single calibration target.
+
+        Args:
+            target (tuple): A tuple (range_index, azimuth_index) for the target.
+            freq_resps (np.ndarray): Frequency responses from range FFTs.
+            array_geometry_reshaped (np.ndarray): Reshaped array geometry.
+
+        Returns:
+            tuple: A tuple containing:
+                - phase_diffs (np.ndarray): The computed phase differences.
+                - steering_vector (np.ndarray): The steering vector for the target.
+        """
+        rng_idx, az_idx = target
+        el_idx = 0
+        steering_vector = self.d[:, az_idx, el_idx]
+
+        shifts = np.exp(1j * 2 * np.pi * (steering_vector @ array_geometry_reshaped) / self.lambda_m)
+        shifts = np.reshape(shifts, (1, shifts.shape[0]))
+
+        shifted_resps = np.multiply(freq_resps[rng_idx, :], shifts)[0]
+        unwrapped_phase = np.unwrap(np.angle(shifted_resps))
+        phase_diffs = np.diff(unwrapped_phase, n=1)
+
+        return phase_diffs, steering_vector
+
+    def _calculate_and_apply_corrections(self, target_phase_diffs, target_steering_vectors, array_geometry_reshaped):
+        """
+        Calculates geometry corrections and applies them to the array geometry.
+
+        Args:
+            target_phase_diffs (np.ndarray): Phase differences for all targets.
+            target_steering_vectors (np.ndarray): Steering vectors for all targets.
+            array_geometry_reshaped (np.ndarray): Reshaped array geometry.
+
+        Returns:
+            np.ndarray: The new, corrected array geometry.
+        """
+        num_elements = target_phase_diffs.shape[1]
+        array_geometry_corrections = np.zeros(shape=(2, num_elements))
+
+        for i in range(num_elements):
+            Phi = target_phase_diffs[:, i]
+            D_j = 2 * np.pi / self.lambda_m * target_steering_vectors[:, 0:2]
+            delta_p = np.linalg.lstsq(D_j, Phi, rcond=None)[0]
+            array_geometry_corrections[:, i] = delta_p
+
+        absolute_corrections = np.cumsum(array_geometry_corrections, axis=1)
+        new_array_geometry = array_geometry_reshaped.copy()
+        new_array_geometry[0:2, 1:] -= absolute_corrections
+        
+        return new_array_geometry
+
+    def perform_array_calibration(self):
+        """
+        Performs self-calibration of the synthetic array geometry by analyzing phase consistency
+        across strong targets in the scene.
+        """
+        # 1. Prepare data and compute range-FFTs
+        adc_cube_reshaped, array_geometry_reshaped, freq_resps = self._prepare_calibration_data()
+
+        # 2. Find strong targets for calibration
+        targets = self._find_calibration_targets(freq_resps, num_targets=3)
+        if len(targets) < 3:
+            print("No suitable calibration targets found.")
+            
+            return np.empty(shape=0)
+
+        # 3. Compute phase differences for each target
+        target_phase_diffs = []
+        target_steering_vectors = []
+        for target in targets:
+            phase_diffs, steering_vector = self._get_phase_diffs_for_target(
+                target, freq_resps, array_geometry_reshaped
+            )
+            target_phase_diffs.append(phase_diffs)
+            target_steering_vectors.append(steering_vector)
+
+        target_phase_diffs = np.array(target_phase_diffs)
+        target_steering_vectors = np.array(target_steering_vectors)
+
+        # 4. Calculate and apply corrections to the array geometry
+        new_array_geometry = self._calculate_and_apply_corrections(
+            target_phase_diffs, target_steering_vectors, array_geometry_reshaped
+        )
+
+        self.array_geometry_calibrated = new_array_geometry.reshape(3, self.num_frames, -1).transpose(1, 0, 2)
+        
+        return new_array_geometry
 
     def process(self,adc_cube:np.ndarray,current_vel:np.ndarray) -> np.ndarray:
         """Compute the beamformed synthetic response
@@ -474,45 +764,23 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         #update the array geometries
         self._update_array_geometries(current_vel=current_vel)
 
-        #reshape the adc_cube
-        adc_cube_reshaped = \
-            self.history_acd_cube_valid_chirps.transpose((1,0,2)).reshape(
-                self.history_acd_cube_valid_chirps.shape[1], #number of samples per chirp
-                -1
-            )
-        
-        #reshpae the array geometry
-        array_geometry_reshaped = \
-            self.p.transpose((1,0,2)).reshape(
-                3,
-                -1
-            )
-
-        # Apply a Hanning window across each column of the adc cube
-        hamming_window = np.hamming(adc_cube_reshaped.shape[1]).reshape(1, -1)
-        adc_cube_reshaped = adc_cube_reshaped * hamming_window
-
 
         if self.array_geometry_valid:
-            for az_angle_idx in range(self.az_angle_bins_rad.shape[0]):
-                for el_angle_idx in range(self.el_angle_bins_rad.shape[0]):
+            
+            #compute the synthetic response
+            beamformed_response = self.compute_synthetic_response(self.array_geometry)
 
-                    steering_vector = self.d[:,az_angle_idx,el_angle_idx]
+            if self.enable_calibration:
+                for _ in range(self.num_calibration_iters):
+                    new_array_geometry = self.perform_array_calibration()
+                    if new_array_geometry.shape[0] != 0:
+                        beamformed_response = self.compute_synthetic_response(
+                            self.array_geometry_calibrated
+                        )
+                    else:
+                        self.array_geometry_calibrated = self.array_geometry
+                        break
 
-                    # Get beamformed response at the steering angle
-                    resp = self.compute_response_at_steering_angle(
-                        adc_cube=adc_cube_reshaped,
-                        array_geometry=array_geometry_reshaped,
-                        steering_vector=steering_vector
-                    )
-
-                    # Save the response
-                    self.beamformed_resp[:,az_angle_idx,el_angle_idx] = resp
-
-            # Commented out CFAR computation on the beamformed response
-            # self.compute_2D_cfar_on_beamformed_resp()
-
-            return self.beamformed_resp
-
+            return beamformed_response
         else:
-            return None
+            return np.empty(shape=0)

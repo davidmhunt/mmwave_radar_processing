@@ -3,6 +3,8 @@ from mmwave_radar_processing.plotting.movie_generator import MovieGenerator
 from mmwave_radar_processing.plotting.plotter_synthetic_array_data_simple_multiframe import PlotterSyntheticArrayData
 from mmwave_radar_processing.processors.simple_synthetic_array_beamformer_processor_multiFrame import SyntheticArrayBeamformerProcessor
 import numpy as np
+import tqdm
+
 
 class MovieGeneratorSyntheticArrayData(MovieGenerator):
 
@@ -50,7 +52,23 @@ class MovieGeneratorSyntheticArrayData(MovieGenerator):
             lidar_radar_offset_rad=np.deg2rad(90),
             convert_to_dB=True,
             cmap="viridis",
+            axs=self.axs,
             show=False
         )
 
         return
+
+    def generate_movie_frames(
+            self,
+            **kwargs):
+        """Generates the movie frames. May need to be modified by child class
+        """
+
+        for i in tqdm.tqdm(range(self.dataset.num_frames)):
+
+            #update the current frame
+            self.generate_movie_frame(idx=i,**kwargs)
+
+            #save the frame
+            if self.processor.array_geometry_valid:
+                self.save_frame(clear_axs=True)

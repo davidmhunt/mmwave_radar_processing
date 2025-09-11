@@ -1,3 +1,4 @@
+from platform import processor
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -53,7 +54,7 @@ class PlotterSyntheticArrayData:
         if self.processor_SABF.array_geometry_valid:
             
             array_geometries_reshaped = \
-                self.processor_SABF.p.transpose(
+                self.processor_SABF.array_geometry.transpose(
                     (1,0,2)
                 ).reshape(3,-1)
 
@@ -300,6 +301,52 @@ class PlotterSyntheticArrayData:
             plt.show()
     
     ####################################################################
+    #Plotting the array pattern
+    ####################################################################
+    def plot_array_pattern(
+            self,
+            ax: plt.Axes = None,
+            show=False
+    ):
+        """Plot a stripMap SAR response (preliminary)
+
+        Args:
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        # Compute synthetic array pattern
+        pattern = self.processor_SABF.compute_synthetic_array_pattern(
+            array_geometry=self.processor_SABF.array_geometry
+        )
+
+        # Convert to dB
+        pattern_db = 20 * np.log10(np.maximum(pattern, 1e-6))
+        az_angle_bins_deg = np.rad2deg(self.processor_SABF.az_angle_bins_rad)
+
+        # Plot the array pattern
+        ax.plot(az_angle_bins_deg, pattern_db, label="Array Pattern")
+
+        # Add vertical line at 0 degrees (boresight)
+        ax.axvline(0, color="gray", linestyle="--", linewidth=1, label="0° Boresight")
+
+        # Labels and formatting
+        ax.set_ylim(-60, 0)
+        ax.set_xlabel("Azimuth Angle (degrees)", fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("Normalized Gain (dB)", fontsize=self.font_size_axis_labels)
+        ax.set_title("Synthetic Array Pattern", fontsize=self.font_size_title)
+        ax.legend()
+
+        if show:
+            plt.show()
+
+
+    ####################################################################
     #Plotting depth map
     #################################################################### 
     def plot_3D_radar_depth_map_spherical(
@@ -367,36 +414,39 @@ class PlotterSyntheticArrayData:
         if not ax:
             fig,ax = plt.subplots()
         
-        #filter out the ground detections
-        valid_idxs = (lidar_pc_raw[:,2] > 0.0) & \
-                    (lidar_pc_raw[:,2] < 2.0)
-        lidar_pc_raw = lidar_pc_raw[valid_idxs,0:2]
+        filtered_lidar_pc = lidar_pc_raw[(lidar_pc_raw[:, 2] >= -0.25) & (lidar_pc_raw[:, 2] <= 0.5)]
 
-        #rotate the lidar pc into the radar's frame of view
-        lidar_pc_raw = apply_rot_trans(
-            lidar_pc_raw,
-            rot_angle_rad=lidar_radar_offset_rad,
+        filtered_lidar_pc = filtered_lidar_pc[:,:2]
+        filtered_lidar_pc = apply_rot_trans(
+            filtered_lidar_pc,
+            rot_angle_rad=np.deg2rad(0), #90 for front, 270 for back
             trans=np.array([0,0])
         )
 
+        # Extract x and y coordinates
+        x_coords = filtered_lidar_pc[:, 0]
+        y_coords = filtered_lidar_pc[:, 1]
+
         # filter only the points that should be able to be seen
-        valid_idxs = (lidar_pc_raw[:,0] > np.min(self.processor_SABF.x_s)) & \
-                    (lidar_pc_raw[:,0] < np.max(self.processor_SABF.x_s)) & \
-                    (lidar_pc_raw[:,1] > np.min(self.processor_SABF.y_s)) & \
-                    (lidar_pc_raw[:,1] < np.max(self.processor_SABF.y_s)) 
-        lidar_pc_raw = lidar_pc_raw[valid_idxs,:]
+        valid_idxs = (y_coords > np.min(self.processor_SABF.y_s)) & \
+                    (y_coords < np.max(self.processor_SABF.y_s)) & \
+                    (x_coords > np.min(self.processor_SABF.x_s)) & \
+                    (x_coords < np.max(self.processor_SABF.x_s)) 
+        
+        x_coords = x_coords[valid_idxs]
+        y_coords = y_coords[valid_idxs]
 
 
-        ax.scatter(lidar_pc_raw[:,0],lidar_pc_raw[:,1],
+        ax.scatter(y_coords,x_coords,
                    c=color,alpha=0.75,
                    s=0.25)
         ax.set_xlim(
-            left=np.min(self.processor_SABF.x_s),
-            right=np.max(self.processor_SABF.x_s)
+            left=np.max(self.processor_SABF.y_s),
+            right=np.min(self.processor_SABF.y_s)
         )
         ax.set_ylim(
             bottom=0,
-            top=np.max(self.processor_SABF.y_s)
+            top=np.max(self.processor_SABF.x_s)
         )
         ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
@@ -458,10 +508,7 @@ class PlotterSyntheticArrayData:
             )
 
             #plot the el beamformed response
-            self.plot_2D_el_beamformed_resp_slice(
-                resp=resp,
-                convert_to_dB=convert_to_dB,
-                cmap=cmap,
+            self.plot_array_pattern(
                 ax=axs[0,2],
                 show=False
             )
