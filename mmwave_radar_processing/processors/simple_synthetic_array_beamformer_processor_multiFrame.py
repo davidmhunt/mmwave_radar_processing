@@ -150,7 +150,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
     
     def _reset_vel_history(self):
 
-        np.zeros(
+        self.history_avg_vel = np.zeros(
             shape=(
                 self.num_frames,
                 3 #x,y,z position
