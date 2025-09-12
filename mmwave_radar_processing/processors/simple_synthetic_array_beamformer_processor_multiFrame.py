@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.constants as constants
 from scipy.signal import find_peaks
+from scipy.interpolate import griddata
 
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
@@ -25,7 +26,8 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             max_vel:np.ndarray=np.array([0.25,0.05,0.05]),
             max_vel_stdev:np.ndarray=np.array([0.1,0.1,0.1]),
             enable_calibration:bool = False,
-            num_calibration_iters:int = 1) -> None:
+            num_calibration_iters:int = 1,
+            interpolated_grid_resolution_m=0.1) -> None:
         """Initialize the SyntheticArrayBeamformerProcessor.
 
         Args:
@@ -49,6 +51,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
                 coordinate frame [x, y, z] to allow for valid processing. Defaults to np.array([0.1, 0.1, 0.1]).
             enable_calibration (bool, optional): Flag to enable array calibration using targets of opportunity. Defaults to False.
             num_calibration_iters (int, optional): Number of iterations for calibration. Defaults to 1.
+            interpolated_grid_resolution_m (float, optional): Grid resolution in meters for interpolating the beamformed response to a Cartesian grid. Defaults to 0.1.
         Notes:
             NOTE: Coordinate frames are defined as (x - forward, y - left, z - up).
             NOTE: Frames are indexed such that idx=-1 is the most recent frame.
@@ -96,6 +99,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
 
         #define the output grid
         self.beamformed_resp:np.ndarray = None #indexed by [rho, theta, phi]
+        self.interpolated_beamformed_resp:np.ndarray = np.empty(shape=0) #indexed by [rho, theta,phi=0] #TODO: update this functionality to select a particular azimuth angle
 
         #mesh grids for spherical plotting - indexed by (rho, theta, phi)
         self.rhos:np.ndarray = None
@@ -106,6 +110,13 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         self.x_s:np.ndarray = None
         self.y_s:np.ndarray = None
         self.z_s:np.ndarray = None
+        self.orig_grid_points:np.ndarray = None #flattened original grid of points from the mesh grid
+
+        #mesh grid for interpolating az response to cartesian grid - indexed by (rho,theta,phi=0) #TODO: update this functionality to select a particular azimuth angle
+        self.interpolated_grid_resolution_m = interpolated_grid_resolution_m
+        self.interp_x_s:np.ndarray = None
+        self.interp_y_s:np.ndarray = None
+        self.interp_grid_points:np.ndarray = None #flattened grid of points for interpolation
 
         #parameters for when to generate the Synthetic response
         self.min_vel:np.array = min_vel
@@ -118,6 +129,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
 
         #flag for tracking if the response is valid or not
         self.array_geometry_valid = False
+        
 
         #load the configuration and configure the response
         super().__init__(config_manager)
@@ -218,6 +230,8 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             self.range_bins, self.az_angle_bins_rad, self.el_angle_bins_rad,
             indexing="ij"
         )
+
+        #compute the cartesian mapping of the mesh grid
         self.x_s = np.multiply(
             np.multiply(self.rhos,np.cos(self.thetas)),
             np.cos(self.phis)
@@ -227,6 +241,23 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             np.cos(self.phis)
         )
         self.z_s = np.multiply(self.rhos,np.sin(self.phis))
+
+        #compute the cartesian mapping of the mesh grid for interpolation
+        x_flat = self.x_s.flatten()
+        y_flat = self.y_s.flatten()
+        # Define the bounds of the linear grid
+        x_min, x_max = np.min(x_flat), np.max(x_flat)
+        y_min, y_max = np.min(y_flat), np.max(y_flat)
+
+
+        x_lin = np.arange(x_min, x_max, self.interpolated_grid_resolution_m)
+        y_lin = np.arange(y_min, y_max, self.interpolated_grid_resolution_m)
+        self.interp_x_s, self.interp_y_s = np.meshgrid(x_lin, y_lin, indexing="ij")
+
+        #compute the flattened grids
+        self.orig_grid_points = np.column_stack((x_flat,y_flat))
+        self.interp_grid_points = np.column_stack((self.interp_x_s.flatten(), self.interp_y_s.flatten()))
+
 
         return
 
@@ -418,9 +449,6 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             current_frame_start_pose = frame_end_pose
         
 
-        
-        
-
     def _compute_beam_stearing_vectors(self):
 
         #generate a mesh grid
@@ -533,6 +561,34 @@ class SyntheticArrayBeamformerProcessor(_Processor):
                     self.beamformed_resp[:,az_angle_idx,el_angle_idx] = resp
 
         return self.beamformed_resp
+    
+    def get_interpolated_response_cart(self)-> np.ndarray:
+        """Get the interpolated beamformed response in Cartesian coordinates in a linear mesh grid.
+
+        Returns:
+            np.ndarray: The interpolated beamformed response.
+        """
+        #flatten the original beamformed response
+        orig_resp_flat = self.beamformed_resp[:,:,0].flatten()
+
+        #perform the interpolation
+        interpolated_response = griddata(
+            points=self.orig_grid_points,
+            values=orig_resp_flat,
+            xi=self.interp_grid_points,
+            method='linear',
+            fill_value=0.0
+        )
+
+        #reshape the interpolated response
+        interpolated_response_reshaped = np.reshape(
+            interpolated_response,
+            self.interp_x_s.shape
+        )
+
+        self.interpolated_beamformed_resp = interpolated_response_reshaped
+
+        return interpolated_response_reshaped
 
     def compute_array_factor_at_angle(
             self,
@@ -590,7 +646,6 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         pattern /= np.max(pattern)
 
         return pattern
-
 
     
     def _prepare_calibration_data(self):
@@ -780,6 +835,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
                     else:
                         self.array_geometry_calibrated = self.array_geometry
                         break
+            self.get_interpolated_response_cart()
 
             return beamformed_response
         else:

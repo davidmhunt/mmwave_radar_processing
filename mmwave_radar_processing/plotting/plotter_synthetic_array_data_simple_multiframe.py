@@ -239,7 +239,68 @@ class PlotterSyntheticArrayData:
 
         if show:
             plt.show()
+    
+    ####################################################################
+    #Plotting interpolated responses from the beamformer
+    #################################################################### 
+    def plot_interpolated_beamformed_resp_cart(
+            self,
+            convert_to_dB=False,
+            cmap="viridis",
+            ax:plt.Axes=None,
+            show=False
+    ):
+        """Plot the interpolated beamformed response in Cartesian coordinates
 
+        Args:
+            convert_to_dB (bool, optional): on True, converts the response to a 
+                log scale. Defaults to False.
+            cmap (str, optional): the color map used for the generated plot
+                (gray is another option). Defaults to "viridis".
+            ax (plt.Axes, optional): the axes on which to display the plot.
+                If none provided, a figure is automatically generated.
+                Defaults to None.
+            show (bool, optional): On true, shows the plot. Defaults to False.
+        """
+
+        if not ax:
+            fig,ax = plt.subplots()
+        
+        if self.processor_SABF.interpolated_beamformed_resp.shape[0] == 0:
+            raise ValueError("Interpolated beamformed response not computed yet. Please run the beamformer first.")
+
+        resp = self.processor_SABF.interpolated_beamformed_resp
+        
+        if convert_to_dB:
+            resp = 20 * np.log10(np.abs(resp))
+            #remove anything below the min_threshold dB down
+            thresholded_val = np.max(resp) - self.min_threshold_dB
+            idxs = resp <= thresholded_val
+            resp[idxs] = thresholded_val
+        else:
+            resp = np.abs(resp)
+        
+        x_s = self.processor_SABF.interp_x_s
+        y_s = self.processor_SABF.interp_y_s
+
+        ax.pcolormesh(
+            y_s,
+            x_s,
+            resp,
+            shading='gouraud',
+            cmap=cmap
+        )
+        
+        ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
+        ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
+        ax.invert_xaxis()
+        if convert_to_dB:
+            ax.set_title("Interpolated Beamformed response (dB)",fontsize=self.font_size_title)
+        else:
+            ax.set_title("Interpolated Beamformed response (mag)",fontsize=self.font_size_title)
+
+        if show:
+            plt.show()
 
     ####################################################################
     #Plotting stripmap sar responses
@@ -513,6 +574,14 @@ class PlotterSyntheticArrayData:
                 show=False
             )
 
+            #plot the interpolated response (input to models downstream)
+            self.plot_interpolated_beamformed_resp_cart(
+                convert_to_dB=convert_to_dB,
+                cmap=cmap,
+                ax=axs[1,1],
+                show=False
+            )
+
             # #plot the depth map
             # self.plot_3D_radar_depth_map_spherical(
             #     resp=resp,
@@ -522,21 +591,21 @@ class PlotterSyntheticArrayData:
             # )
 
             # plot the StripMap SAR response if available
-            if self.processor_stripMapSAR:
-                sar_resp = self.processor_stripMapSAR.process(
-                    adc_cube=adc_cube,
-                    vel_m_per_s=np.abs(vels)[0],
-                    sensor_height_m=0.24,
-                    rx_index=0,
-                    max_SAR_distance=1.5
-                )
-                self.plot_stripmap_SAR_resp(
-                    resp=sar_resp,
-                    convert_to_dB=convert_to_dB,
-                    cmap=cmap,
-                    ax=axs[1,2],
-                    show=False
-                )
+            # if self.processor_stripMapSAR:
+            #     sar_resp = self.processor_stripMapSAR.process(
+            #         adc_cube=adc_cube,
+            #         vel_m_per_s=np.abs(vels)[0],
+            #         sensor_height_m=0.24,
+            #         rx_index=0,
+            #         max_SAR_distance=1.5
+            #     )
+            #     self.plot_stripmap_SAR_resp(
+            #         resp=sar_resp,
+            #         convert_to_dB=convert_to_dB,
+            #         cmap=cmap,
+            #         ax=axs[1,2],
+            #         show=False
+            #     )
 
             #plot the CFAR detections
             # plot the az beamformed response
