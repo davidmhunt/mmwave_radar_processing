@@ -80,12 +80,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         self.chirp_start_times_us:np.ndarray = None
 
         #history tracking
-        self.history_avg_vel:np.ndarray = np.zeros(
-            shape=(
-                num_frames,
-                3 #x,y,z position
-            ),dtype=float) #indexed by [frame,(x,y,z)]
-        
+        self.history_avg_vel:np.ndarray = None
         self.history_acd_cube_valid_chirps:np.ndarray = None #indexed by [frame, sample, chirp]
 
         #array geometry
@@ -99,7 +94,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
 
         #define the output grid
         self.beamformed_resp:np.ndarray = None #indexed by [rho, theta, phi]
-        self.interpolated_beamformed_resp:np.ndarray = np.empty(shape=0) #indexed by [rho, theta,phi=0] #TODO: update this functionality to select a particular azimuth angle
+        self.interpolated_beamformed_resp:np.ndarray = np.empty(shape=0) #indexed by [rho, theta] at phi=0 #TODO: update this functionality to select a particular azimuth angle
 
         #mesh grids for spherical plotting - indexed by (rho, theta, phi)
         self.rhos:np.ndarray = None
@@ -112,7 +107,7 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         self.z_s:np.ndarray = None
         self.orig_grid_points:np.ndarray = None #flattened original grid of points from the mesh grid
 
-        #mesh grid for interpolating az response to cartesian grid - indexed by (rho,theta,phi=0) #TODO: update this functionality to select a particular azimuth angle
+        #mesh grid for interpolating az response to cartesian grid - indexed by (rho,theta) at phi=0 #TODO: update this functionality to select a particular azimuth angle
         self.interpolated_grid_resolution_m = interpolated_grid_resolution_m
         self.interp_x_s:np.ndarray = None
         self.interp_y_s:np.ndarray = None
@@ -148,8 +143,22 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         #define the output grid
         self._init_out_resp()
 
+        #reset the velocity history tracking
+        self._reset_vel_history()
+
         return
-     
+    
+    def _reset_vel_history(self):
+
+        np.zeros(
+            shape=(
+                self.num_frames,
+                3 #x,y,z position
+            ),dtype=float) #indexed by [frame,(x,y,z)]
+
+        self.array_geometry_valid = False
+        return
+    
     def _compute_key_radar_parameters(self):
 
         #configure the range bins
