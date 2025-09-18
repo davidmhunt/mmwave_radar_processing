@@ -119,7 +119,7 @@ class PlotterOdometryData(PlotterMmWaveData):
                     estimated=altitude_est_history,
                     ground_truth=altitude_gt_history,
                     ax=axs[1,2],
-                    value_label="Altitude Error (m)",
+                    value_label="Error (m)",
                     show=False
                 )
         else:

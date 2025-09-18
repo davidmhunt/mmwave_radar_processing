@@ -549,50 +549,65 @@ class PlotterMmWaveData:
     ####################################################################
     def plot_estimated_vs_ground_truth(
         self,
-        estimated:np.ndarray,
-        ground_truth:np.ndarray,
-        ax:plt.Axes=None,
+        estimated: np.ndarray,
+        ground_truth: np.ndarray,
+        ax: plt.Axes = None,
         value_label="Altitude (m)",
+        frame_rate=-1,
         show=False
-        ):
-        """Plot the estimated value against the ground truth value
+    ):
+        """Plot the estimated value against the ground truth value.
 
         Args:
             estimated (np.ndarray): 1D array of estimated values.
             ground_truth (np.ndarray): 1D array of ground truth values.
             ax (plt.Axes, optional): The axes on which to display the plot. If None, a figure is automatically generated. Defaults to None.
             value_label (str, optional): Label for the y-axis. Defaults to "Altitude (m)".
+            frame_rate (float, optional): Frame rate in Hz. If provided, x-axis will be in time instead of frame index. Defaults to -1.
             show (bool, optional): If True, shows the plot. Defaults to False.
         """
 
         if not ax:
-            fig,ax = plt.subplots()
-    
-        #check to make sure that both arrays have data
+            fig, ax = plt.subplots()
+
+        # Check to make sure that both arrays have data
+        if estimated.size == 0 and ground_truth.size == 0:
+            return
+
+        # Determine x-axis values
+        if frame_rate > 0:
+            x_values = np.arange(len(estimated)) / frame_rate if estimated.size > 0 else np.arange(len(ground_truth)) / frame_rate
+            x_label = "Time (s)"
+        else:
+            x_values = np.arange(len(estimated)) if estimated.size > 0 else np.arange(len(ground_truth))
+            x_label = "Frame index"
+
+        # Plot estimated and ground truth values
         if estimated.size > 0:
-            ax.plot(estimated, color='blue', linewidth=2, label='Estimated Value')
+            ax.plot(x_values[:len(estimated)], estimated, color='blue', linewidth=2, label='Estimated Value')
         if ground_truth.size > 0:
-            ax.plot(ground_truth, color='orange', linewidth=2, label='Ground Truth Value')
-        
-        ax.set_xlabel("Frame index",fontsize=self.font_size_axis_labels)
-        ax.set_ylabel(value_label,fontsize=self.font_size_axis_labels)
-        ax.set_title(f"Estimated {value_label}\nvs Ground Truth",fontsize=self.font_size_title)
-        
+            ax.plot(x_values[:len(ground_truth)], ground_truth, color='orange', linewidth=2, label='Ground Truth Value')
+
+        ax.set_xlabel(x_label, fontsize=self.font_size_axis_labels)
+        ax.set_ylabel(value_label, fontsize=self.font_size_axis_labels)
+        ax.set_title(f"Estimated {value_label}\nvs Ground Truth", fontsize=self.font_size_title)
+
         ax.tick_params(labelsize=self.font_size_ticks)
         ax.grid(True)
-        ax.legend(fontsize=self.font_size_legend, loc='upper right')
+        ax.legend(fontsize=self.font_size_legend, loc='lower left')
 
         if show:
             plt.show()
         
     def plot_estimated_vs_ground_truth_error(
         self,
-        estimated:np.ndarray,
-        ground_truth:np.ndarray,
-        ax:plt.Axes=None,
+        estimated: np.ndarray,
+        ground_truth: np.ndarray,
+        ax: plt.Axes = None,
         value_label="Altitude (m)",
+        frame_rate=-1,
         show=False
-        ):
+    ):
         """Plot the error between the estimated value and the ground truth value.
 
         Args:
@@ -600,25 +615,37 @@ class PlotterMmWaveData:
             ground_truth (np.ndarray): 1D array of ground truth values.
             ax (plt.Axes, optional): The axes on which to display the plot. If None, a figure is automatically generated. Defaults to None.
             value_label (str, optional): Label for the y-axis. Defaults to "Altitude (m)".
+            frame_rate (float, optional): Frame rate in Hz. If provided, x-axis will be in time instead of frame index. Defaults to -1.
             show (bool, optional): If True, shows the plot. Defaults to False.
         """
 
         if not ax:
-            fig,ax = plt.subplots()
+            fig, ax = plt.subplots()
     
-        #check to make sure that both arrays have data
+        # Check to make sure that both arrays have data
         if estimated.size == 0 or ground_truth.size == 0:
             return
-        # check to make sure arrays are same length
+        # Check to make sure arrays are the same length
         if estimated.shape[0] != ground_truth.shape[0]:
             raise ValueError("Estimated and ground truth arrays must have the same length.")
 
+        # Calculate error
         error = estimated - ground_truth
-        ax.plot(error, color='blue', linewidth=2, label='Errors')
 
-        ax.set_xlabel("Frame index",fontsize=self.font_size_axis_labels)
-        ax.set_ylabel(f"{value_label} error",fontsize=self.font_size_axis_labels)
-        ax.set_title(f"Estimated {value_label}\nvs Ground Truth",fontsize=self.font_size_title)
+        # Determine x-axis values
+        if frame_rate > 0:
+            x_values = np.arange(len(error)) / frame_rate
+            x_label = "Time (s)"
+        else:
+            x_values = np.arange(len(error))
+            x_label = "Frame index"
+
+        # Plot the error
+        ax.plot(x_values, error, color='blue', linewidth=2, label='Errors')
+
+        ax.set_xlabel(x_label, fontsize=self.font_size_axis_labels)
+        ax.set_ylabel(f"{value_label} error", fontsize=self.font_size_axis_labels)
+        ax.set_title(f"Estimated {value_label} Error\nvs Ground Truth", fontsize=self.font_size_title)
         
         ax.tick_params(labelsize=self.font_size_ticks)
         ax.grid(True)

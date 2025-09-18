@@ -23,7 +23,7 @@ class PlotterSyntheticArrayData:
         self.plot_x_max = 10
         self.plot_y_max = 20
         self.marker_size = 10
-        self.min_threshold_dB = 30
+        self.min_threshold_dB = 35
 
         #configuration manager
         self.config_manager:ConfigManager = config_manager
@@ -72,21 +72,25 @@ class PlotterSyntheticArrayData:
 
             ax.scatter(y_coords,x_coords)
 
+            # ax.set_ylim(
+            #     bottom= np.min(x_coords) + \
+            #         -1 * self.processor_SABF.lambda_m/8,
+            #     top=np.max(x_coords) + \
+            #         self.processor_SABF.lambda_m/8
+            # )
             ax.set_ylim(
-                bottom= np.min(x_coords) + \
-                    -1 * self.processor_SABF.lambda_m/8,
-                top=np.max(x_coords) + \
-                    self.processor_SABF.lambda_m/8
+                bottom= -0.05,
+                top=0.05
             )
-            ax.set_yticks(
-                ticks=np.linspace(
-                    start= np.min(x_coords) + \
-                    -1 * self.processor_SABF.lambda_m/8,                        
-                    stop=np.max(x_coords) + \
-                    self.processor_SABF.lambda_m/8,
-                    num=3
-                )
-            )
+            # ax.set_yticks(
+            #     ticks=np.linspace(
+            #         start= np.min(x_coords) + \
+            #         -1 * self.processor_SABF.lambda_m/8,                        
+            #         stop=np.max(x_coords) + \
+            #         self.processor_SABF.lambda_m/8,
+            #         num=3
+            #     )
+            # )
             
             ax.set_xlim(
                 left=np.min(y_coords) -1 * self.processor_SABF.lambda_m/8,
@@ -102,9 +106,10 @@ class PlotterSyntheticArrayData:
             formatter={'float_kind': lambda x: f"{x:.2f}"},
             separator=', '
         )
-        title_str = "Dynamically computed array:\nvelocity: {} m/s".format(
-            formatted_vels
-        )
+        # title_str = "Dynamically computed array:\nvelocity: {} m/s".format(
+        #     formatted_vels
+        # )
+        title_str = "Dynamically computed array"
         ax.set_title(title_str,
                     fontsize=self.font_size_title)
 
