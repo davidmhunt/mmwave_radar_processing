@@ -572,6 +572,7 @@ class PlotterSyntheticArrayData:
                 ax=axs[0,1],
                 show=False
             )
+            axs[0,1].set_title("Beamformed Response",fontsize=self.font_size_title)
 
             #plot the el beamformed response
             self.plot_array_pattern(
@@ -586,6 +587,7 @@ class PlotterSyntheticArrayData:
                 ax=axs[1,1],
                 show=False
             )
+            axs[1,1].set_title("Model Input",fontsize=self.font_size_title)
 
             # #plot the depth map
             # self.plot_3D_radar_depth_map_spherical(
