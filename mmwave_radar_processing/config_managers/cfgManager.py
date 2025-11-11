@@ -185,20 +185,23 @@ class ConfigManager:
         return self.profile_cfgs[profile_idx]["freqSlope_MHz_us"]
 
     def print_cfg_overview(self):
-        print(f"range res: {self.range_res_m}")
-        print(f"range max: {self.range_max_m}")
-        print(f"profile config: \n\t{self.profile_cfgs[0]}")
-        print(f"Frame loops: {self.frameCfg_loops}")
-        print(f"vel res: {self.vel_res_m_s}")
-        print(f"vel max: {self.vel_max_m_s}")
-
+        print("---- Radar Configuration Overview ----")
+        print("Radar Performance")
+        print(f"\trange res: {self.range_res_m:.2f}m")
+        print(f"\trange max: {self.range_max_m:.2f}m")
+        print(f"\tvel res: {self.vel_res_m_s:.2f}m/s")
+        print(f"\tvel max: {self.vel_max_m_s:.2f}m/s")
+        print("Profile Configuration:")
+        print(f"\tprofile config: \n\t{self.profile_cfgs[0]}")
+        print(f"\tFrame loops: {self.frameCfg_loops}")
         chirp_period_us = self.profile_cfgs[0]['idleTime_us'] + self.profile_cfgs[0]['rampEndTime_us']
-        print(f"Chirp period: {chirp_period_us} us")
-
+        print(f"\tChirp period: {chirp_period_us} us")
         num_tx_antennas = self.frameCfg_end_index - self.frameCfg_start_index + 1
         active_frame_period = num_tx_antennas * self.frameCfg_loops * chirp_period_us * 1e-3
-        print(f"Active frame time: {active_frame_period} ms")
-        print(f"Frame period: {self.frameCfg_periodicity_ms}")
+        print(f"\tActive frame time: {active_frame_period} ms")
+        print(f"\tFrame period: {self.frameCfg_periodicity_ms}")
+        print(f"\tAntenna Geometry: {self.array_geometry}")
+        print(f"\tOperating Frequency: {self.profile_cfgs[0]['startFreq_GHz']} GHz")
 
     ####################################################################
     #loading the radar configuration
