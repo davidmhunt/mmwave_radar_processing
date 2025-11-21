@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
-from mmwave_radar_processing.processors.simple_synthetic_array_beamformer_processor import SyntheticArrayBeamformerProcessor
+from mmwave_radar_processing.processors.archived.simple_synthetic_array_beamformer_processor import SyntheticArrayBeamformerProcessor
 from mmwave_radar_processing.supportFns.rotation_functions import apply_rot_trans
 from mmwave_radar_processing.processors.strip_map_SAR_processor import StripMapSARProcessor
 
