@@ -58,12 +58,11 @@ git submodule update --init
 1. Check to see if Python Poetry is installed. If the below command is successful, poetry is installed move on to setting up the conda environment
 
 ```
-    #for now ensure that it is lower than version 2.0 (TOML files are out of date)
     poetry --version
 ```
 2. If Python Poetry is not installed, follow the [Poetry Install Instructions](https://python-poetry.org/docs/#installing-with-the-official-installer). On linux, Poetry can be installed using the following command:
 ```
-curl -sSL https://install.python-poetry.org | python3 - --version 1.8.4
+curl -sSL https://install.python-poetry.org | python3 -
 ```
 
 If you are using poetry over an ssh connection or get an error in the following steps, try running the following command first and then continuing with the remainder fo the installation.
@@ -71,22 +70,21 @@ If you are using poetry over an ssh connection or get an error in the following 
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 ```
 
+Finally, make sure that poetry is installing everything into the environment (i.e. not using system packages)
+```
+poetry config virtualenvs.options.system-site-packages true
+```
+
 #### Installing mmwave_radar_processing
-Navigate to the mmwave_radar_processing foler (this folder) and execute the following command
-
 ```
-poetry install --extras "submodules"
-```
-
-If you get an an error saying: "Failed to unlock the collection!", execute the following command in the terminal:
-```
-export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
+cd mmwave_radar_processing
+poetry install #without submodules
+poetry install --with submodules #with submodules
 ```
 
 #### Updating mmwave_radar_processing
 If the pyproject.toml file is updated, the poetry installation must also be updated. Use the following commands to update the version of poetry
 ```
-poetry lock --no-update
 poetry install
 ```
 
