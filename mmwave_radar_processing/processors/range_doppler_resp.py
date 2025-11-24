@@ -1,3 +1,5 @@
+"""Range-Doppler FFT processing utilities."""
+
 import numpy as np
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
@@ -5,9 +7,17 @@ from mmwave_radar_processing.processors._processor import _Processor
 
 class RangeDopplerProcessor(_Processor):
 
+    """Process ADC cubes into Range-Doppler responses."""
+
     def __init__(
             self,
             config_manager: ConfigManager) -> None:
+
+        """Initialize the processor and set up bin containers.
+
+        Args:
+            config_manager: Loaded configuration manager with radar parameters.
+        """
 
         #phase shifts
         self.vel_bins:np.ndarray = None
@@ -20,6 +30,8 @@ class RangeDopplerProcessor(_Processor):
 
     
     def configure(self):
+
+        """Compute range and velocity bin centers from configuration."""
         
         self.vel_bins = np.arange(
             start=-1 * self.config_manager.vel_max_m_s,
@@ -35,6 +47,15 @@ class RangeDopplerProcessor(_Processor):
     
     def apply_range_vel_hanning_window(self,
             adc_cube: np.ndarray):
+
+        """Apply Hanning windows along range and velocity dimensions.
+
+        Args:
+            adc_cube: Raw ADC data cube with shape (n_rx, n_range_bins, n_chirps).
+
+        Returns:
+            Windowed ADC cube ready for Range-Doppler FFT.
+        """
         
         #rangeFFT - apply hanning window
         hanning_window_range = np.hanning(adc_cube.shape[1])
@@ -46,18 +67,42 @@ class RangeDopplerProcessor(_Processor):
 
         return adc_cube_windowed
 
-    def process(self, adc_cube: np.ndarray, rx_idx = 0) -> np.ndarray:
+    def process(
+            self,
+            adc_cube: np.ndarray,
+            rx_idx: int = 0,
+            return_magnitude: bool = True) -> np.ndarray:
+
+        """Generate the Range-Doppler response.
+
+        Args:
+            adc_cube: Raw ADC data cube with shape (n_rx, n_range_bins, n_chirps).
+            rx_idx: Antenna index to return. Use -1 to return responses for all
+                antennas instead of a specific one.
+            return_magnitude: If True, return the magnitude response via ``np.abs``;
+                otherwise return the complex FFT output.
+
+        Returns:
+            Range-Doppler response. If ``rx_idx`` is non-negative, the output
+            shape is (n_range_bins, n_chirps). If ``rx_idx`` is -1, the output
+            shape is (n_rx, n_range_bins, n_chirps). Complex or magnitude is
+            determined by ``return_magnitude``.
+        """
 
         adc_cube = self.apply_range_vel_hanning_window(adc_cube)
 
-        data = adc_cube[rx_idx,:,:]
-
         #compute the Range-Doppler FFT
-        response = np.abs(np.fft.fftshift(
+        response = np.fft.fftshift(
             x=np.fft.fft2(
-                data,axes=(-2,-1)
+                adc_cube,axes=(-2,-1)
             ),
-            axes=1
-        ))
+            axes=-1
+        )
+
+        if return_magnitude:
+            response = np.abs(response)
+
+        if rx_idx >= 0:
+            response = response[rx_idx,:,:]
         return response
     
