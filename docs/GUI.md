@@ -9,7 +9,7 @@ Plan for a PyQt6 + pyqtgraph GUI that fits the existing `mmwave_radar_processing
 - Keep plotting logic in the new visualization layer; avoid mutating processor math.
 - Initial pass keeps processing sequential on the UI loop where possible; threading/performance tuning is planned, not implemented in v1.
 - Default dataset/config load behavior mirrors `scripts/view_radar_data.py` (e.g., dataset root `/data/RadVel`, config dir from `CONFIG_DIRECTORY`, and `6843_RadVel_ods_20Hz.cfg` with `array_geometry="ods"`, `array_direction="down"`), with CLI flags to override.
-- Processor parameters (e.g., `num_angle_bins` for `RangeAngleProcessor`) load from a shared YAML file; defaults match the current `view_radar_data.py` usage where applicable.
+- Dataset and processor parameters load from shared YAML files (`visualization/configs/dataset_params.yaml`, `visualization/configs/processor_params.yaml`); defaults match the current `view_radar_data.py` usage where applicable.
 - Logging: stdout-only via `mmwave_radar_processing/logging/logger.py`; GUI/scripts default to INFO level with CLI override. No in-GUI log panel for v1.
 
 ## MVC architecture
@@ -56,7 +56,8 @@ mmwave_radar_processing/
       video_export.py                # grabs frames from a view and writes video
       threading.py                   # worker helpers (planned for later)
     configs/
-        processor_params.yaml              # default processor parameter file (shared across processors)
+        dataset_params.yaml         # dataset + config defaults
+        processor_params.yaml       # processor parameters (shared across processors)
 scripts/
   launch_mmwave_viewer.py            # CLI entry point (dataset-root, config-name, log-level, processor-params)
 ```
@@ -87,6 +88,7 @@ Each entry includes:
 - `base_view.py` is the abstract parent defining the shared widget scaffolding and `set_data`/lifecycle API that all concrete views subclass.
 - Parameter injection: controller applies per-processor parameters from the YAML file at construction time (with validation and fallbacks to code defaults).
 - Logging hooks: controller/views/processors accept an optional logger parameter (defaulting to `get_logger(__name__)`); no module-level logger globals in classes.
+- Dataset params: controller/models load dataset and default config from `dataset_params.yaml` (CpslDS init kwargs plus config name/array geometry/direction).
 
 ## Data flow
 1) Source selection: dataset (`CpslDS`) or live stream adapter (same interface: `next_frame()`, `seek(frame_idx)`, `frame_rate` hint).  
@@ -122,19 +124,41 @@ Each entry includes:
   processors:
     range_angle_resp:
       num_angle_bins: 64
-      rx_antennas: []          # optional override
+      rx_antennas: []          # process() kwarg
+      chirp_idx: 0             # process() kwarg
     range_doppler_resp:
-      window: hanning          # placeholder, if implemented later
+      rx_idx: 0                # process() kwarg
     micro_doppler_resp:
       target_ranges: [3.0, 3.7]
-      num_frames_history: 20
+      num_frames_history: 20   # __init__
+      rx_idx: 0                # process() kwarg
     doppler_azimuth_resp:
-      num_angle_bins: 64
+      num_angle_bins: 64       # __init__
+      valid_angle_range: [-1.04719755, 1.04719755]  # __init__
+      min_zoom_fft_vel_span: 0.1                    # __init__
+      rx_antennas: []          # process() kwarg
+      range_window: []         # process() kwarg
+      shift_angle: true        # process() kwarg
+      use_precise_fft: false   # process() kwarg
+      precise_vel_range: [-0.25, 0.25]              # process() kwarg
     range_resp:
-      window: hanning
+      chirp_idx: 0             # process() kwarg
   ```
-  Controller loads this once, validates keys against the registry, applies recognized parameters to processor constructors, and logs warnings for unknown keys. Missing parameters fall back to processor defaults. Control panel allows swapping/reloading the YAML at runtime.
-- Launcher (`scripts/launch_mmwave_viewer.py`) CLI params: `--dataset-root` (root path to CPSL datasets), `--config-name` (basename in `configs/`), `--log-level` (e.g., INFO/DEBUG), `--processor-params` (path to YAML in `configs/`, default `processor_params.yaml`); defaults pulled from the `view_radar_data.py` settings and environment (`CONFIG_DIRECTORY`). Launcher calls `setup_logger(level=parsed_level)` once, then passes loggers into controller/views/processors.
+  Controller loads this once, validates keys against the registry, and applies only parameters that exist in each processor's `__init__` or `process()` signature; logs warnings for unknown keys. Missing parameters fall back to processor defaults. Control panel allows swapping/reloading the YAML at runtime.
+- Dataset parameter YAML: includes CpslDS kwargs and config metadata:
+  ```yaml
+  dataset:
+    dataset_path: /data/RadVel/CPSL_RadVel_ods_20Hz_1
+    radar_adc_folder: radar_0_adc
+    camera_folder: camera
+    ...
+  config:
+    name: 6843_RadVel_ods_20Hz.cfg
+    array_geometry: ods
+    array_direction: down
+  ```
+  Launcher loads this to set defaults for dataset and config if CLI flags are not provided.
+- Launcher (`scripts/launch_mmwave_viewer.py`) CLI params: `--dataset-params` (path to YAML, default `visualization/configs/dataset_params.yaml`), `--dataset-path` (overrides dataset path from YAML), `--config-name` (overrides config name from YAML), `--log-level` (e.g., INFO/DEBUG), `--processor-params` (path to YAML in `configs/`, default `processor_params.yaml`); defaults pulled from the YAML. Launcher calls `setup_logger(level=parsed_level)` once, then passes loggers into controller/views/processors.
 
 ## Threading and performance (planned)
 - Future: offload heavy processors to worker threads/pools and batch emits to avoid signal storms.
@@ -143,7 +167,7 @@ Each entry includes:
 
 ## View layout selection
 - Initial approach: right view area uses a fixed 2x3 grid (QGridLayout) to match the five initial responses; each slot has a dropdown to choose which response to render (or hide). This keeps simultaneous comparison easy and avoids complex docking.  
-- Future option: replace the grid with dockable/tabbed panels if more flexibility is needed as planned views grow.
+- Responsive grid: dynamically resizes to show only active views, up to three columns per row; adds rows as needed. Future option: dockable/tabbed panels if more flexibility is needed.
 
 ## Implementation phases
 1) Scaffolding: directory creation, entry script, base controller, base view, registry with implemented items.  
@@ -154,4 +178,4 @@ Each entry includes:
 6) Threading/performance enhancements (planned after initial pass).  
 7) Planned processors/views: add stubs to registry and placeholder views; implement incrementally.  
 8) Logging integration: ensure GUI components use injected loggers; replace any `print` in GUI modules with logger calls.
-9) Polish: presets for colormaps/thresholds, layout persistence, logging pane (future if desired).
+9) Polish: presets for colormaps/thresholds, layout persistence, logging pane (future if desired), dB/magnitude toggle wiring.

@@ -28,6 +28,7 @@ dependencies = [
     "pyqt6 (>=6.4.0,<7.0.0)",
     "imageio[ffmpeg] (>=2.37.2,<3.0.0)",
     "pyopengl (>=3.1.10,<4.0.0)",
+    "pyyaml (>=6.0.0,<7.0.0)",
 ]
 
 [tool.poetry]
