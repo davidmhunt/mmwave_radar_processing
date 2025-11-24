@@ -32,23 +32,28 @@ class MainWindow(QMainWindow):
         self,
         controller,
         registry: Dict[str, ProcessorSpec],
+        dataset_path: Optional[str] = None,
+        config_path: Optional[str] = None,
+        params_path: Optional[str] = None,
         parent: Optional[QWidget] = None,
         logger=None,
     ) -> None:
         """Initialize the main window.
 
         Args:
-            controller: Controller instance coordinating data/processing.
-            registry: Mapping of processor keys to processor specifications.
-            parent: Optional parent widget.
-            logger: Optional logger instance.
+        controller: Controller instance coordinating data/processing.
+        registry: Mapping of processor keys to processor specifications.
+        parent: Optional parent widget.
+        logger: Optional logger instance.
         """
         super().__init__(parent)
         self.logger = logger or get_logger(__name__)
         self.controller = controller
         self.registry = registry
+        self.dataset_path = dataset_path
+        self.config_path = config_path
+        self.params_path = params_path
         self.view_widgets: Dict[str, BaseView] = {}
-        self.active_states: Dict[str, bool] = {key: True for key in registry.keys()}
         self.grid_layout: Optional[QGridLayout] = None
         self.views_container: Optional[QWidget] = None
         self._init_ui()
@@ -70,19 +75,32 @@ class MainWindow(QMainWindow):
         control_panel.config_selected.connect(self.controller.load_config)
         control_panel.params_selected.connect(lambda path: self.logger.info("Params file selected: %s", path))
         control_panel.db_mode_changed.connect(self._set_db_mode)
+        if self.dataset_path:
+            control_panel.set_dataset_path(self.dataset_path)
+        if self.config_path:
+            control_panel.set_config_path(self.config_path)
+        if self.params_path:
+            control_panel.set_params_path(self.params_path)
         root_layout.addWidget(control_panel, 1)
 
         self.views_container = QWidget()
         self.grid_layout = QGridLayout(self.views_container)
         self.grid_layout.setContentsMargins(4, 4, 4, 4)
         self.grid_layout.setSpacing(4)
+        root_layout.setStretch(0, 1)
+        root_layout.setStretch(1, 3)
 
-        for key, spec in self.registry.items():
+        row_col_positions = [(r, c) for r in range(2) for c in range(3)]
+        for idx, (key, spec) in enumerate(self.registry.items()):
+            if idx >= len(row_col_positions):
+                break
+            row, col = row_col_positions[idx]
             view_cls: Type[BaseView] = spec.view_cls  # type: ignore
             view_widget = view_cls(parent=self)
             self.view_widgets[key] = view_widget
-
-        self._rebuild_view_grid()
+            self.grid_layout.addWidget(view_widget, row, col)
+            self.grid_layout.setRowStretch(row, 1)
+            self.grid_layout.setColumnStretch(col, 1)
         root_layout.addWidget(self.views_container, 3)
 
         status = QStatusBar()
@@ -104,35 +122,17 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(central)
         self.resize(1200, 800)
+        try:
+            self.controller.dataset_loaded.connect(self._set_frame_count)
+        except Exception as exc:
+            self.logger.warning("Could not connect dataset_loaded signal: %s", exc)
 
     def _handle_view_toggle(self, states: Dict[str, bool]) -> None:
         """Show or hide views based on toggle states."""
-        self.active_states.update(states)
-        self._rebuild_view_grid()
-
-    def _rebuild_view_grid(self) -> None:
-        """Rebuild the grid layout based on active views."""
-        if not self.grid_layout:
-            return
-        while self.grid_layout.count():
-            item = self.grid_layout.takeAt(0)
-            widget = item.widget()
+        for key, enabled in states.items():
+            widget = self.view_widgets.get(key)
             if widget:
-                self.grid_layout.removeWidget(widget)
-                widget.setParent(None)
-
-        active_keys = [k for k, enabled in self.active_states.items() if enabled]
-        for idx, key in enumerate(active_keys):
-            spec = self.registry[key]
-            widget = self.view_widgets[key]
-            row = idx // 3
-            col = idx % 3
-            self.grid_layout.addWidget(widget, row, col)
-            widget.show()
-        for key in self.registry.keys():
-            if key not in active_keys:
-                widget = self.view_widgets[key]
-                widget.hide()
+                widget.setVisible(enabled)
 
     def _set_db_mode(self, enabled: bool) -> None:
         """Toggle dB mode across all views."""
@@ -142,6 +142,18 @@ class MainWindow(QMainWindow):
     def _update_frame_label(self, value: int) -> None:
         """Update the current frame label."""
         self.frame_label.setText(f"Frame: {value}")
+
+    def _set_frame_count(self, count: int) -> None:
+        """Update slider maximum and label based on dataset frame count.
+
+        Args:
+            count: Number of frames in the loaded dataset.
+        """
+        maximum = max(count - 1, 0)
+        self.frame_slider.setMaximum(maximum)
+        if self.frame_slider.value() > maximum:
+            self.frame_slider.setValue(maximum)
+        self._update_frame_label(self.frame_slider.value())
 
     def _populate_placeholder_data(self) -> None:
         """Populate placeholder data so views are immediately visible."""

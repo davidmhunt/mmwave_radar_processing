@@ -49,6 +49,7 @@ class ControlPanel(QWidget):
         self.available_views = available_views
         self.view_checkboxes: Dict[str, QCheckBox] = {}
         self._build_ui()
+        self._emit_view_toggle()
 
     def _build_ui(self) -> None:
         """Build the UI layout."""
@@ -141,3 +142,15 @@ class ControlPanel(QWidget):
     def _emit_db_mode(self) -> None:
         """Emit the dB mode state."""
         self.db_mode_changed.emit(self.db_checkbox.isChecked())
+
+    def set_dataset_path(self, path: str) -> None:
+        """Set the dataset path text."""
+        self.dataset_path_edit.setText(path)
+
+    def set_config_path(self, path: str) -> None:
+        """Set the config path text."""
+        self.config_edit.setText(path)
+
+    def set_params_path(self, path: str) -> None:
+        """Set the params path text."""
+        self.params_edit.setText(path)

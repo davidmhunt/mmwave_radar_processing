@@ -93,7 +93,7 @@ Each entry includes:
 ## Data flow
 1) Source selection: dataset (`CpslDS`) or live stream adapter (same interface: `next_frame()`, `seek(frame_idx)`, `frame_rate` hint).  
 2) Controller pulls raw frame, passes config + frame to the needed processors (based on which views are visible/subscribed). Processors always run inside the controller pipeline, not in views.  
-3) Processors return numpy arrays; controller emits per-view signals with payloads.  
+3) Processors return numpy arrays; controller emits per-view signals with dict payloads that include both data and axes bins/metadata expected by each view.  
 4) Views render via pyqtgraph; control panel tweaks view params (dB toggle, cmap, thresholds).  
 5) Video export requests hook into the controller to capture rendered frames from a view and stream them to `imageio` writers.  
 6) Errors/slowdowns surfaced through status bar/log pane.
@@ -170,12 +170,12 @@ Each entry includes:
 - Responsive grid: dynamically resizes to show only active views, up to three columns per row; adds rows as needed. Future option: dockable/tabbed panels if more flexibility is needed.
 
 ## Implementation phases
-1) Scaffolding: directory creation, entry script, base controller, base view, registry with implemented items.  
-2) Models: dataset/config wrappers, source adapters, basic error handling.  
-3) Views (initial five responses) with pyqtgraph widgets and simple controls.  
-4) Controller wiring: playback/live loops, processor dispatch, signal plumbing, status updates.  
-5) Video export utility and UI hook.  
-6) Threading/performance enhancements (planned after initial pass).  
-7) Planned processors/views: add stubs to registry and placeholder views; implement incrementally.  
-8) Logging integration: ensure GUI components use injected loggers; replace any `print` in GUI modules with logger calls.
+1) ~~Scaffolding: directory creation, entry script, base controller, base view, registry with implemented items.~~  
+2) ~~Models: dataset/config wrappers, source adapters, basic error handling.~~  
+3) ~~Views (initial five responses) with pyqtgraph widgets and simple controls.~~  
+4) ~~Controller wiring: playback/live loops, processor dispatch, signal plumbing, status updates.~~  
+5) Planned processors/views: add stubs to registry and placeholder views; implement incrementally.  
+6) ~~Logging integration: ensure GUI components use injected loggers; replace any `print` in GUI modules with logger calls.~~  
+7) Video export utility and UI hook.
+8) Threading/performance enhancements (planned after initial pass).  
 9) Polish: presets for colormaps/thresholds, layout persistence, logging pane (future if desired), dB/magnitude toggle wiring.

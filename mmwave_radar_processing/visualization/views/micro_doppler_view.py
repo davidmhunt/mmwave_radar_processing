@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pyqtgraph as pg
@@ -27,18 +27,18 @@ class MicroDopplerView(BaseView):
         self.plot.setTitle("Micro-Doppler Heatmap")
         layout.addWidget(self.plot)
 
-    def set_data(self, payload: Any) -> None:
-        """Update the view with new data."""
-        if payload is None:
+    def set_data(self, payload: Dict[str, Any]) -> None:
+        """Update the view with new data.
+
+        Args:
+            payload: Dictionary containing micro-Doppler data and metadata.
+        """
+        if not isinstance(payload, dict):
+            self.logger.warning("MicroDopplerView expected dict payload, got %s", type(payload))
             return
-        if isinstance(payload, dict):
-            data = np.array(payload.get("data"))
-            time_bins = payload.get("time_bins")
-            vel_bins = payload.get("vel_bins")
-        else:
-            data = np.array(payload)
-            time_bins = None
-            vel_bins = None
+        data = np.array(payload.get("data"))
+        time_bins = payload.get("time_bins")
+        vel_bins = payload.get("vel_bins")
         if data.size == 0:
             return
         display = np.copy(data)

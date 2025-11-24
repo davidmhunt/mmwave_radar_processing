@@ -1,10 +1,8 @@
-"""
-Base view class for GUI visualization components.
-"""
+"""Base view class for GUI visualization components."""
 
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QSizePolicy, QWidget
 
 from mmwave_radar_processing.logging.logger import get_logger
 
@@ -22,12 +20,14 @@ class BaseView(QWidget):
         super().__init__(parent)
         self.logger = logger or get_logger(__name__)
         self.convert_to_db = False
+        self.setMinimumSize(200, 150)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def set_data(self, payload: Any) -> None:
         """Update the view with new data.
 
         Args:
-            payload: Data emitted by the controller for this view.
+            payload: Dictionary emitted by the controller for this view.
         """
         raise NotImplementedError("Subclasses must implement set_data.")
 

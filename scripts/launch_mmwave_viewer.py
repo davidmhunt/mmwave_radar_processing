@@ -78,8 +78,23 @@ def main() -> None:
     logger.info("Processor params: %s", args.processor_params)
     app = QApplication(sys.argv)
     registry = get_default_registry(logger=logger)
-    controller = mmWaveRadarProcessorController(registry=registry, logger=logger)
-    window = MainWindow(controller=controller, registry=registry, logger=logger)
+    controller = mmWaveRadarProcessorController(
+        registry=registry,
+        logger=logger,
+        dataset_params_path=args.dataset_params,
+        processor_params_path=args.processor_params,
+        dataset_override=dataset_path,
+        config_override=config_name,
+    )
+    window = MainWindow(
+        controller=controller,
+        registry=registry,
+        logger=logger,
+        dataset_path=str(dataset_path),
+        config_path=str(Path("configs") / config_name),
+        params_path=str(args.processor_params),
+    )
+    controller.dataset_loaded.connect(lambda count: window.frame_slider.setMaximum(max(count - 1, 0)))
     window.show()
     sys.exit(app.exec())
 

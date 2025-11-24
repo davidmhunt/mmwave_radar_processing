@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import yaml
 
@@ -16,42 +16,51 @@ class DatasetModel:
 
     def __init__(
         self,
-        params_path: Path,
+        params: Union[Path, Dict[str, Any]],
         logger=None,
+        dataset_path_override: Optional[Path] = None,
     ) -> None:
-        """Initialize the dataset model from a YAML parameters file.
+        """Initialize the dataset model from a YAML parameters file or dict.
 
         Args:
-            params_path: Path to the dataset parameters YAML.
+            params: Path to the dataset parameters YAML or already-parsed dict.
             logger: Optional logger instance.
+            dataset_path_override: Optional dataset path override.
         """
         self.logger = logger or get_logger(__name__)
         self.dataset: Optional[CpslDS] = None
-        self.params = self._load_params(params_path)
-        self.load_from_params(self.params)
+        self.params = self._load_params(params)
+        self.load_from_params(self.params, dataset_path_override=dataset_path_override)
 
-    def _load_params(self, params_path: Path) -> Dict[str, Any]:
-        """Load dataset parameters from YAML.
+    def _load_params(self, params: Union[Path, Dict[str, Any]]) -> Dict[str, Any]:
+        """Load dataset parameters from YAML or dict.
 
         Args:
-            params_path: Path to the YAML file.
+            params: Path to the YAML file or a dict of parameters.
 
         Returns:
             Parsed parameter dictionary.
         """
-        params_path = Path(params_path)
+        if isinstance(params, dict):
+            return params
+        params_path = Path(params)
         self.logger.info("Loading dataset params from %s", params_path)
         with params_path.open("r") as handle:
             data = yaml.safe_load(handle) or {}
         return data
 
-    def load_from_params(self, params: Dict[str, Any]) -> None:
+    def load_from_params(
+        self, params: Dict[str, Any], dataset_path_override: Optional[Path] = None
+    ) -> None:
         """Load a dataset using provided parameters.
 
         Args:
             params: Dataset parameter mapping (including CpslDS kwargs).
+            dataset_path_override: Optional dataset path override.
         """
-        dataset_params = params.get("dataset", {})
+        dataset_params = params.get("dataset", {}).copy()
+        if dataset_path_override:
+            dataset_params["dataset_path"] = str(dataset_path_override)
         dataset_path = dataset_params.get("dataset_path", "")
         self.logger.info("Loading dataset from %s", dataset_path)
         self.dataset = CpslDS(**dataset_params)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pyqtgraph as pg
@@ -27,18 +27,18 @@ class RangeAngleView(BaseView):
         self.plot.setTitle("Range-Azimuth Heatmap (Polar.)")
         layout.addWidget(self.plot)
 
-    def set_data(self, payload: Any) -> None:
-        """Update the view with new data."""
-        if payload is None:
+    def set_data(self, payload: Dict[str, Any]) -> None:
+        """Update the view with new data.
+
+        Args:
+            payload: Dictionary containing range-angle data and metadata.
+        """
+        if not isinstance(payload, dict):
+            self.logger.warning("RangeAngleView expected dict payload, got %s", type(payload))
             return
-        if isinstance(payload, dict):
-            data = np.array(payload.get("data"))
-            angle_bins = payload.get("angle_bins")
-            range_bins = payload.get("range_bins")
-        else:
-            data = np.array(payload)
-            angle_bins = None
-            range_bins = None
+        data = np.array(payload.get("data"))
+        angle_bins = payload.get("angle_bins")
+        range_bins = payload.get("range_bins")
         if data.size == 0:
             return
 
