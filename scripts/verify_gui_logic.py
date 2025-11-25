@@ -66,8 +66,36 @@ def verify_logic():
     for key in expected_processors:
         if key in received_updates:
             logger.info("PASS: Received update for %s", key)
-            data = received_updates[key]["data"]
+            payload = received_updates[key]
+            data = payload["data"]
             logger.info("  Data shape: %s", data.shape)
+            
+            # Check metadata
+            if key == "range_doppler_resp":
+                if "range_bins" in payload and "vel_bins" in payload:
+                    logger.info("  PASS: Metadata present (range_bins, vel_bins)")
+                else:
+                    logger.error("  FAIL: Missing metadata for %s", key)
+            elif key == "range_resp":
+                if "range_bins" in payload:
+                    logger.info("  PASS: Metadata present (range_bins)")
+                else:
+                    logger.error("  FAIL: Missing metadata for %s", key)
+            elif key == "range_angle_resp":
+                if "range_bins" in payload and "angle_bins" in payload:
+                    logger.info("  PASS: Metadata present (range_bins, angle_bins)")
+                else:
+                    logger.error("  FAIL: Missing metadata for %s", key)
+            elif key == "micro_doppler_resp":
+                if "time_bins" in payload and "vel_bins" in payload:
+                    logger.info("  PASS: Metadata present (time_bins, vel_bins)")
+                else:
+                    logger.error("  FAIL: Missing metadata for %s. Keys: %s", key, payload.keys())
+            elif key == "doppler_azimuth_resp":
+                if "angle_bins" in payload and "vel_bins" in payload:
+                    logger.info("  PASS: Metadata present (angle_bins, vel_bins)")
+                else:
+                    logger.error("  FAIL: Missing metadata for %s", key)
         else:
             logger.error("FAIL: No update for %s", key)
 

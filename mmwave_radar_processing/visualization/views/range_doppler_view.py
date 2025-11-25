@@ -26,6 +26,15 @@ class RangeDopplerView(BaseView):
         self.plot.setLabel("left", "Range (m)")
         self.plot.setTitle("Range-Doppler Heatmap")
         layout.addWidget(self.plot)
+        self.set_colormap("viridis")
+
+    def set_colormap(self, name: str = "viridis") -> None:
+        """Set the colormap for the image item."""
+        try:
+            cmap = pg.colormap.get(name)
+            self.image.setLookupTable(cmap.getLookupTable())
+        except Exception as exc:
+            self.logger.warning("Failed to set colormap %s: %s", name, exc)
 
     def set_data(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.

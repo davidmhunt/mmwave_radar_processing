@@ -26,6 +26,7 @@ class MicroDopplerView(BaseView):
         self.plot.setLabel("left", "Velocity (m/s)")
         self.plot.setTitle("Micro-Doppler Heatmap")
         layout.addWidget(self.plot)
+        self.set_colormap("viridis")
 
     def set_data(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.

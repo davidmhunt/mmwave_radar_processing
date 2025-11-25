@@ -46,3 +46,11 @@ class BaseView(QWidget):
             enabled: True to convert data to dB before rendering.
         """
         self.convert_to_db = enabled
+
+    def set_colormap(self, name: str = "viridis") -> None:
+        """Set the colormap for the view.
+
+        Args:
+            name: Name of the colormap (e.g., 'viridis', 'magma', 'jet').
+        """
+        pass  # Subclasses should implement if applicable

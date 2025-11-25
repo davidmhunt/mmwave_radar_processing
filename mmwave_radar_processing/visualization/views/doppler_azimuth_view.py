@@ -26,6 +26,7 @@ class DopplerAzimuthView(BaseView):
         self.plot.setLabel("left", "Angle (rad)")
         self.plot.setTitle("Doppler-Azimuth Heatmap")
         layout.addWidget(self.plot)
+        self.set_colormap("viridis")
 
     def set_data(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.

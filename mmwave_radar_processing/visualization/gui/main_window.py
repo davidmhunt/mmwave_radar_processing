@@ -124,8 +124,18 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
         try:
             self.controller.dataset_loaded.connect(self._set_frame_count)
+            self.controller.view_update.connect(self._handle_view_update)
+            # Connect slider to controller processing
+            self.frame_slider.valueChanged.connect(self.controller.process_next_frame)
+            
+            # Check if dataset is already loaded
+            if self.controller.dataset_model:
+                count = self.controller.dataset_model.frame_count()
+                if count > 0:
+                    self._set_frame_count(count)
+                    
         except Exception as exc:
-            self.logger.warning("Could not connect dataset_loaded signal: %s", exc)
+            self.logger.warning("Could not connect signals: %s", exc)
 
     def _handle_view_toggle(self, states: Dict[str, bool]) -> None:
         """Show or hide views based on toggle states."""
@@ -133,6 +143,17 @@ class MainWindow(QMainWindow):
             widget = self.view_widgets.get(key)
             if widget:
                 widget.setVisible(enabled)
+
+    def _handle_view_update(self, key: str, payload: Dict[str, Any]) -> None:
+        """Update a specific view with new data.
+
+        Args:
+            key: Registry key of the view to update.
+            payload: Data payload for the view.
+        """
+        widget = self.view_widgets.get(key)
+        if widget:
+            widget.set_data(payload)
 
     def _set_db_mode(self, enabled: bool) -> None:
         """Toggle dB mode across all views."""

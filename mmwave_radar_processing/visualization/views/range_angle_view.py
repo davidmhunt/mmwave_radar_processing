@@ -26,6 +26,7 @@ class RangeAngleView(BaseView):
         self.plot.setLabel("left", "Range (m)")
         self.plot.setTitle("Range-Azimuth Heatmap (Polar.)")
         layout.addWidget(self.plot)
+        self.set_colormap("viridis")
 
     def set_data(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.

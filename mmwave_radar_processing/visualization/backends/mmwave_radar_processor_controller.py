@@ -190,16 +190,33 @@ class mmWaveRadarProcessorController(QObject):
                     # Construct payload matching view's set_data expectation
                     payload = {"data": result}
                     
-                    # Add metadata if available (e.g. axes)
-                    # This depends on the processor. 
-                    # For RangeDoppler, we need range_bins and vel_bins.
-                    # These are usually available in the processor or config.
-                    if hasattr(processor, "range_bins"):
+                    # Add metadata if available
+                    if hasattr(processor, "range_bins") and processor.range_bins is not None:
                         payload["range_bins"] = processor.range_bins
-                    if hasattr(processor, "velocity_bins"):
-                        payload["vel_bins"] = processor.velocity_bins
-                    if hasattr(processor, "angle_bins"):
-                        payload["angle_bins"] = processor.angle_bins
+                    
+                    if hasattr(processor, "vel_bins") and processor.vel_bins is not None:
+                        # Special handling for DopplerAzimuthProcessor which might use zoomed bins
+                        if key == "doppler_azimuth_resp" and hasattr(processor, "zoomed_vel_bins") \
+                           and processor.zoomed_vel_bins is not None and processor.zoomed_vel_bins.size > 0:
+                             # Check if precise FFT was used. 
+                             # We can check if the output shape matches zoomed_vel_bins
+                             # result shape is [vel, angle]
+                             if result.shape[0] == processor.zoomed_vel_bins.size:
+                                 payload["vel_bins"] = processor.zoomed_vel_bins
+                             else:
+                                 payload["vel_bins"] = processor.vel_bins
+                        else:
+                            payload["vel_bins"] = processor.vel_bins
+
+                    if hasattr(processor, "angle_bins") and processor.angle_bins is not None:
+                        # Special handling for DopplerAzimuthProcessor which filters angles
+                        if key == "doppler_azimuth_resp" and hasattr(processor, "valid_angle_bins"):
+                             payload["angle_bins"] = processor.valid_angle_bins
+                        else:
+                            payload["angle_bins"] = processor.angle_bins
+                            
+                    if hasattr(processor, "time_bins") and processor.time_bins is not None:
+                        payload["time_bins"] = processor.time_bins
                     
                     self.view_update.emit(key, payload)
 
