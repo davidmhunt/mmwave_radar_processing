@@ -28,6 +28,7 @@ class ProcessorSpec:
     required_inputs: Optional[str]
     output_schema: Optional[str]
     enabled: bool = True
+    num_frames_history: int = 1
 
 
 def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
@@ -66,6 +67,7 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             required_inputs="adc_cube",
             output_schema="range_bins x velocity_bins ndarray",
             enabled=True,
+            num_frames_history=1,
         ),
         "range_resp": ProcessorSpec(
             key="range_resp",
@@ -75,6 +77,7 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             required_inputs="adc_cube",
             output_schema="range_bins ndarray",
             enabled=True,
+            num_frames_history=1,
         ),
         "range_angle_resp": ProcessorSpec(
             key="range_angle_resp",
@@ -84,6 +87,7 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             required_inputs="adc_cube",
             output_schema="range_bins x angle_bins ndarray",
             enabled=True,
+            num_frames_history=1,
         ),
         "micro_doppler_resp": ProcessorSpec(
             key="micro_doppler_resp",
@@ -93,6 +97,7 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             required_inputs="adc_cube",
             output_schema="time x velocity ndarray",
             enabled=True,
+            num_frames_history=20,
         ),
         "doppler_azimuth_resp": ProcessorSpec(
             key="doppler_azimuth_resp",
@@ -102,6 +107,7 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             required_inputs="adc_cube",
             output_schema="angle_bins x velocity ndarray",
             enabled=True,
+            num_frames_history=1,
         ),
     }
     logger.debug("Default processor registry created with keys: %s", list(registry.keys()))

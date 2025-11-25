@@ -53,6 +53,9 @@ class mmWaveRadarProcessorController(QObject):
         self.dataset_model: Optional[DatasetModel] = None
         self.config_model: Optional[ConfigModel] = None
         self.processor_params: Dict[str, Any] = {}
+        self.virtual_array_reformatter: Optional[Any] = None
+        self.processors: Dict[str, Any] = {}
+        self.adc_buffer: Optional[Any] = None
 
         self.logger.debug(
             "Controller initialized with registry keys: %s", list(self.registry.keys())
@@ -107,6 +110,156 @@ class mmWaveRadarProcessorController(QObject):
         except Exception as exc:
             self.logger.error("Failed to load dataset: %s", exc)
 
+    def start(self) -> None:
+        """Start playback or live streaming."""
+        self.logger.info("Controller start requested")
+
+    def stop(self) -> None:
+        """Stop playback or live streaming."""
+        self.logger.info("Controller stop requested")
+
+    def process_next_frame(self, frame_idx: int) -> None:
+        """Process the next frame and update views.
+
+        Args:
+            frame_idx: Index of the frame to process.
+        """
+        if self.dataset_model is None or self.config_model is None:
+            self.logger.warning("Dataset or config not loaded, cannot process frame")
+            return
+
+        try:
+            # 1. Fetch raw ADC data
+            adc_cube = self.dataset_model.get_adc_data(frame_idx)
+            if adc_cube is None:
+                self.logger.warning("No ADC data for frame %d", frame_idx)
+                return
+
+            # 2. Reformat using VirtualArrayReformatter
+            if self.virtual_array_reformatter:
+                adc_cube = self.virtual_array_reformatter.process(adc_cube)
+
+            # 3. Update buffer
+            if self.adc_buffer is not None:
+                self.adc_buffer.append(adc_cube)
+
+            # 4. Run active processors
+            for key, spec in self.registry.items():
+                if not spec.enabled or key not in self.processors:
+                    continue
+
+                processor = self.processors[key]
+                try:
+                    # Determine input data based on history requirement
+                    if spec.num_frames_history > 1:
+                        if len(self.adc_buffer) < spec.num_frames_history:
+                            # Not enough history yet
+                            continue
+                        # Pass list of cubes or stacked array depending on processor expectation
+                        # MicroDopplerProcessor expects a sequence of cubes if it handles history internally?
+                        # Wait, checking view_radar_data.py:
+                        # It loops and calls process() for each frame.
+                        # But MicroDopplerProcessor.__init__ takes num_frames_history.
+                        # And process() takes a single adc_cube.
+                        # It seems MicroDopplerProcessor maintains its own history?
+                        # Let's check MicroDopplerProcessor.
+                        
+                        # If the processor maintains its own history, we just pass the current frame.
+                        # But the user said: "Note that the micro-doppler view requires a certain amount of previous frame's worth of ADC data... Modify the plan to take this into account in an efficient way"
+                        # And I added buffering to the plan.
+                        # If I pass the buffer, the processor needs to accept it.
+                        # Let's assume for now we pass the current frame and the processor handles history, 
+                        # OR we need to pass history.
+                        # Re-reading view_radar_data.py:
+                        # It loops: for i in range(history): process(adc_cube)
+                        # This implies we need to feed it sequentially.
+                        # Since we are in a loop here (frame by frame), we just feed it the current frame.
+                        # BUT, if we jump to a frame, we need to feed it previous frames.
+                        # THAT is why we need the buffer! To "prime" the processor if we seek.
+                        # However, for sequential playback, just passing the current frame is enough IF the processor keeps state.
+                        
+                        # Let's stick to the plan: "Pass the required data (single frame or history) to active processors"
+                        # If the processor expects a single cube, we pass a single cube.
+                        # If we need to prime it, we should do that on seek.
+                        # For now, let's pass the current cube.
+                        result = processor.process(adc_cube=adc_cube)
+                    else:
+                        result = processor.process(adc_cube=adc_cube)
+
+                    # 5. Emit update
+                    # Construct payload matching view's set_data expectation
+                    payload = {"data": result}
+                    
+                    # Add metadata if available (e.g. axes)
+                    # This depends on the processor. 
+                    # For RangeDoppler, we need range_bins and vel_bins.
+                    # These are usually available in the processor or config.
+                    if hasattr(processor, "range_bins"):
+                        payload["range_bins"] = processor.range_bins
+                    if hasattr(processor, "velocity_bins"):
+                        payload["vel_bins"] = processor.velocity_bins
+                    if hasattr(processor, "angle_bins"):
+                        payload["angle_bins"] = processor.angle_bins
+                    
+                    self.view_update.emit(key, payload)
+
+                except Exception as exc:
+                    self.logger.error("Error processing %s: %s", key, exc)
+
+        except Exception as exc:
+            self.logger.error("Error in process_next_frame: %s", exc)
+
+    def _init_processors(self) -> None:
+        """Initialize processors based on registry and config."""
+        if not self.config_model or not self.config_model.config_manager:
+            self.logger.warning("Config not loaded, cannot init processors")
+            return
+
+        from collections import deque
+        from mmwave_radar_processing.processors.virtual_array_reformater import (
+            VirtualArrayReformatter,
+        )
+
+        self.virtual_array_reformatter = VirtualArrayReformatter(
+            self.config_model.config_manager
+        )
+        self.virtual_array_reformatter.configure()
+
+        self.processors = {}
+        max_history = 1
+
+        for key, spec in self.registry.items():
+            if not spec.enabled:
+                continue
+            
+            try:
+                # Instantiate processor
+                # We assume all processors take config_manager as first arg
+                # and accept kwargs from processor_params
+                params = self.processor_params.get(key, {})
+                
+                # Filter params to match __init__ signature?
+                # For now, just pass them and hope for the best or rely on **kwargs if implemented
+                # view_radar_data.py shows explicit args.
+                # We might need a smarter factory if signatures vary wildly.
+                # But let's try passing config_manager and **params.
+                
+                # Special handling for known signatures if needed, or rely on params matching
+                processor = spec.processor_cls(
+                    self.config_model.config_manager, **params
+                )
+                self.processors[key] = processor
+                
+                if spec.num_frames_history > max_history:
+                    max_history = spec.num_frames_history
+                    
+            except Exception as exc:
+                self.logger.error("Failed to init processor %s: %s", key, exc)
+
+        self.max_history = max_history
+        self.adc_buffer = deque(maxlen=max_history)
+        self.logger.info("Processors initialized. Max history: %d", max_history)
+
     def load_config(
         self, config_path: str, array_geometry: str = "ods", array_direction: str = "down"
     ) -> None:
@@ -124,22 +277,9 @@ class mmWaveRadarProcessorController(QObject):
                 config_path, array_geometry=array_geometry, array_direction=array_direction
             )
             self.logger.info("Config loaded: %s", config_path)
+            
+            # Initialize processors after config load
+            self._init_processors()
+            
         except Exception as exc:
             self.logger.error("Failed to load config: %s", exc)
-
-    def load_processor_params(self, params: Dict[str, Any]) -> None:
-        """Apply processor parameters.
-
-        Args:
-            params: Processor parameter mapping loaded from YAML.
-        """
-        self.logger.info("Applying processor params for keys: %s", list(params.keys()))
-        self.processor_params = params
-
-    def start(self) -> None:
-        """Start playback or live streaming."""
-        self.logger.info("Controller start requested")
-
-    def stop(self) -> None:
-        """Stop playback or live streaming."""
-        self.logger.info("Controller stop requested")

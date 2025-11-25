@@ -18,7 +18,7 @@ class ConfigModel:
             logger: Optional logger instance.
         """
         self.logger = logger or get_logger(__name__)
-        self.manager = ConfigManager()
+        self.config_manager = ConfigManager()
 
     def load(
         self,
@@ -34,11 +34,11 @@ class ConfigModel:
             array_direction: Array direction setting.
         """
         self.logger.info("Loading config from %s", config_path)
-        self.manager.load_cfg(
+        self.config_manager.load_cfg(
             config_path,
             array_geometry=array_geometry,
             array_direction=array_direction,
         )
-        self.manager.compute_radar_perforance(profile_idx=0)
-        self.manager.print_cfg_overview()
+        self.config_manager.compute_radar_perforance(profile_idx=0)
+        self.config_manager.print_cfg_overview()
 
