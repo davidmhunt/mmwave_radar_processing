@@ -36,7 +36,7 @@ class RangeDopplerView(BaseView):
         except Exception as exc:
             self.logger.warning("Failed to set colormap %s: %s", name, exc)
 
-    def set_data(self, payload: Dict[str, Any]) -> None:
+    def update_view(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.
 
         Args:
@@ -52,9 +52,16 @@ class RangeDopplerView(BaseView):
         if data.size == 0:
             return
 
-        display = np.flipud(np.copy(data))
+        # Processor usually returns [range, velocity].
+        # pyqtgraph expects [x, y] -> [velocity, range].
+        # So we transpose.
+        display = data.T
+        
         if self.convert_to_db:
-            display = 20 * np.log10(np.maximum(display, 1e-12))
+            display = 20 * np.log10(np.maximum(np.abs(display), 1e-12))
+        else:
+            display = np.abs(display)
+            
         self.image.setImage(display, autoLevels=True)
 
         if vel_bins is not None and range_bins is not None:

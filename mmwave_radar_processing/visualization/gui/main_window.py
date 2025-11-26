@@ -125,8 +125,13 @@ class MainWindow(QMainWindow):
         try:
             self.controller.dataset_loaded.connect(self._set_frame_count)
             self.controller.view_update.connect(self._handle_view_update)
+            self.controller.frame_processed.connect(self._update_slider_from_controller)
             # Connect slider to controller processing
             self.frame_slider.valueChanged.connect(self.controller.process_next_frame)
+            
+            # Connect playback controls
+            self.play_button.clicked.connect(self.controller.start)
+            self.pause_button.clicked.connect(self.controller.stop)
             
             # Check if dataset is already loaded
             if self.controller.dataset_model:
@@ -175,6 +180,13 @@ class MainWindow(QMainWindow):
         if self.frame_slider.value() > maximum:
             self.frame_slider.setValue(maximum)
         self._update_frame_label(self.frame_slider.value())
+
+    def _update_slider_from_controller(self, frame_idx: int) -> None:
+        """Update slider position from controller (e.g. during playback)."""
+        self.frame_slider.blockSignals(True)
+        self.frame_slider.setValue(frame_idx)
+        self.frame_slider.blockSignals(False)
+        self._update_frame_label(frame_idx)
 
     def _populate_placeholder_data(self) -> None:
         """Populate placeholder data so views are immediately visible."""

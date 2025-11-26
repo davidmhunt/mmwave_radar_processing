@@ -28,7 +28,15 @@ class MicroDopplerView(BaseView):
         layout.addWidget(self.plot)
         self.set_colormap("viridis")
 
-    def set_data(self, payload: Dict[str, Any]) -> None:
+    def set_colormap(self, name: str = "viridis") -> None:
+        """Set the colormap for the image item."""
+        try:
+            cmap = pg.colormap.get(name)
+            self.image.setLookupTable(cmap.getLookupTable())
+        except Exception as exc:
+            self.logger.warning("Failed to set colormap %s: %s", name, exc)
+
+    def update_view(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.
 
         Args:
@@ -40,15 +48,22 @@ class MicroDopplerView(BaseView):
         data = np.array(payload.get("data"))
         time_bins = payload.get("time_bins")
         vel_bins = payload.get("vel_bins")
+
         if data.size == 0:
             return
-        display = np.copy(data)
+
+        # Processor usually returns [velocity, time].
+        # pyqtgraph expects [x, y] -> [time, velocity].
+        # So we transpose.
+        display = data.T
+        
         if self.convert_to_db:
-            display = 20 * np.log10(np.maximum(display, 1e-12))
-            title = "Micro-Doppler Heatmap (dB)"
+            display = 20 * np.log10(np.maximum(np.abs(display), 1e-12))
         else:
-            title = "Micro-Doppler Heatmap (mag)"
+            display = np.abs(display)
+            
         self.image.setImage(display, autoLevels=True)
+
         if time_bins is not None and vel_bins is not None:
             self.image.setRect(
                 QRectF(
@@ -58,4 +73,6 @@ class MicroDopplerView(BaseView):
                     vel_bins[-1] - vel_bins[0],
                 )
             )
+
+        title = "Micro-Doppler Heatmap (dB)" if self.convert_to_db else "Micro-Doppler Heatmap (mag)"
         self.plot.setTitle(title)

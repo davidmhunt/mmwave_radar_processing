@@ -25,7 +25,7 @@ class RangeResponseView(BaseView):
         self.plot.setTitle("Range FFT")
         layout.addWidget(self.plot)
 
-    def set_data(self, payload: Dict[str, Any]) -> None:
+    def update_view(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.
 
         Args:
@@ -38,14 +38,16 @@ class RangeResponseView(BaseView):
         rng_bins = payload.get("range_bins")
         if data.size == 0:
             return
-        display = data.copy()
+        
         if self.convert_to_db:
-            display = 20 * np.log10(np.maximum(display, 1e-12))
+            display = 20 * np.log10(np.maximum(np.abs(data), 1e-12))
             self.plot.setLabel("left", "Amplitude (dB)")
             self.plot.setTitle("Range FFT (dB)")
         else:
+            display = np.abs(data)
             self.plot.setLabel("left", "Amplitude (mag)")
             self.plot.setTitle("Range FFT (mag)")
+            
         if rng_bins is None:
             x_vals = np.arange(display.shape[0])
         else:

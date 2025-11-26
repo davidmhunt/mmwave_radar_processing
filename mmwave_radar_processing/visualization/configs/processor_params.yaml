@@ -1,7 +1,7 @@
 processors:
   range_angle_resp:
     num_angle_bins: 64
-    rx_antennas: []
+    rx_antennas: [0,3,4,7]
     chirp_idx: 0
   range_doppler_resp:
     rx_idx: 0
@@ -13,7 +13,7 @@ processors:
     num_angle_bins: 64
     valid_angle_range: [-1.04719755, 1.04719755]
     min_zoom_fft_vel_span: 0.1
-    rx_antennas: []
+    rx_antennas: [0,3,4,7]
     range_window: []
     shift_angle: true
     use_precise_fft: false

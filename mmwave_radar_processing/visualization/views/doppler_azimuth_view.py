@@ -28,11 +28,19 @@ class DopplerAzimuthView(BaseView):
         layout.addWidget(self.plot)
         self.set_colormap("viridis")
 
-    def set_data(self, payload: Dict[str, Any]) -> None:
+    def set_colormap(self, name: str = "viridis") -> None:
+        """Set the colormap for the image item."""
+        try:
+            cmap = pg.colormap.get(name)
+            self.image.setLookupTable(cmap.getLookupTable())
+        except Exception as exc:
+            self.logger.warning("Failed to set colormap %s: %s", name, exc)
+
+    def update_view(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.
 
         Args:
-            payload: Dictionary containing Doppler-azimuth data and metadata.
+            payload: Dictionary containing Doppler-Azimuth data and metadata.
         """
         if not isinstance(payload, dict):
             self.logger.warning("DopplerAzimuthView expected dict payload, got %s", type(payload))
@@ -40,22 +48,31 @@ class DopplerAzimuthView(BaseView):
         data = np.array(payload.get("data"))
         vel_bins = payload.get("vel_bins")
         angle_bins = payload.get("angle_bins")
+
         if data.size == 0:
             return
-        display = np.copy(data)
+
+        # Processor usually returns [velocity, angle].
+        # pyqtgraph expects [x, y] -> [angle, velocity].
+        # So we transpose.
+        display = data.T
+        
         if self.convert_to_db:
-            display = 20 * np.log10(np.maximum(display, 1e-12))
-            title = "Doppler-Azimuth Heatmap (dB)"
+            display = 20 * np.log10(np.maximum(np.abs(display), 1e-12))
         else:
-            title = "Doppler-Azimuth Heatmap (mag)"
+            display = np.abs(display)
+            
         self.image.setImage(display, autoLevels=True)
+
         if vel_bins is not None and angle_bins is not None:
             self.image.setRect(
                 QRectF(
-                    vel_bins[0],
                     angle_bins[0],
-                    vel_bins[-1] - vel_bins[0],
+                    vel_bins[0],
                     angle_bins[-1] - angle_bins[0],
+                    vel_bins[-1] - vel_bins[0],
                 )
             )
+
+        title = "Doppler-Azimuth Heatmap (dB)" if self.convert_to_db else "Doppler-Azimuth Heatmap (mag)"
         self.plot.setTitle(title)

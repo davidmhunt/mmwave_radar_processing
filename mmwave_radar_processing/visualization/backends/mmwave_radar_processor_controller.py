@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from mmwave_radar_processing.logging.logger import get_logger
 from mmwave_radar_processing.visualization.backends.processor_registry import (
@@ -21,6 +21,7 @@ class mmWaveRadarProcessorController(QObject):
 
     view_update = pyqtSignal(str, object)
     dataset_loaded = pyqtSignal(int)
+    frame_processed = pyqtSignal(int)
 
     def __init__(
         self,
@@ -56,6 +57,10 @@ class mmWaveRadarProcessorController(QObject):
         self.virtual_array_reformatter: Optional[Any] = None
         self.processors: Dict[str, Any] = {}
         self.adc_buffer: Optional[Any] = None
+        self.last_processed_frame: int = -1
+        
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._on_timer_timeout)
 
         self.logger.debug(
             "Controller initialized with registry keys: %s", list(self.registry.keys())
@@ -107,16 +112,37 @@ class mmWaveRadarProcessorController(QObject):
             frame_count = self.dataset_model.frame_count()
             self.logger.info("Dataset loaded: %s", dataset_path)
             self.dataset_loaded.emit(frame_count)
+            # Reset processing state
+            self.last_processed_frame = -1
+            if self.adc_buffer:
+                self.adc_buffer.clear()
         except Exception as exc:
             self.logger.error("Failed to load dataset: %s", exc)
 
     def start(self) -> None:
         """Start playback or live streaming."""
         self.logger.info("Controller start requested")
+        if self.dataset_model and self.dataset_model.frame_count() > 0:
+            self.timer.start(50)  # 20 FPS
 
     def stop(self) -> None:
         """Stop playback or live streaming."""
         self.logger.info("Controller stop requested")
+        self.timer.stop()
+
+    def _on_timer_timeout(self) -> None:
+        """Handle playback timer timeout."""
+        if not self.dataset_model:
+            self.stop()
+            return
+
+        next_frame = self.last_processed_frame + 1
+        if next_frame >= self.dataset_model.frame_count():
+            self.logger.info("End of dataset reached")
+            self.stop()
+            return
+
+        self.process_next_frame(next_frame)
 
     def process_next_frame(self, frame_idx: int) -> None:
         """Process the next frame and update views.
@@ -129,6 +155,18 @@ class mmWaveRadarProcessorController(QObject):
             return
 
         try:
+            # Check for seek/discontinuity
+            if frame_idx != self.last_processed_frame + 1:
+                self.logger.info("Seek detected: %d -> %d. Resetting buffer.", self.last_processed_frame, frame_idx)
+                if self.adc_buffer:
+                    self.adc_buffer.clear()
+                # Reset processors if they have state
+                for processor in self.processors.values():
+                    if hasattr(processor, "reset"):
+                        processor.reset()
+            
+            self.last_processed_frame = frame_idx
+
             # 1. Fetch raw ADC data
             adc_cube = self.dataset_model.get_adc_data(frame_idx)
             if adc_cube is None:
@@ -155,33 +193,6 @@ class mmWaveRadarProcessorController(QObject):
                         if len(self.adc_buffer) < spec.num_frames_history:
                             # Not enough history yet
                             continue
-                        # Pass list of cubes or stacked array depending on processor expectation
-                        # MicroDopplerProcessor expects a sequence of cubes if it handles history internally?
-                        # Wait, checking view_radar_data.py:
-                        # It loops and calls process() for each frame.
-                        # But MicroDopplerProcessor.__init__ takes num_frames_history.
-                        # And process() takes a single adc_cube.
-                        # It seems MicroDopplerProcessor maintains its own history?
-                        # Let's check MicroDopplerProcessor.
-                        
-                        # If the processor maintains its own history, we just pass the current frame.
-                        # But the user said: "Note that the micro-doppler view requires a certain amount of previous frame's worth of ADC data... Modify the plan to take this into account in an efficient way"
-                        # And I added buffering to the plan.
-                        # If I pass the buffer, the processor needs to accept it.
-                        # Let's assume for now we pass the current frame and the processor handles history, 
-                        # OR we need to pass history.
-                        # Re-reading view_radar_data.py:
-                        # It loops: for i in range(history): process(adc_cube)
-                        # This implies we need to feed it sequentially.
-                        # Since we are in a loop here (frame by frame), we just feed it the current frame.
-                        # BUT, if we jump to a frame, we need to feed it previous frames.
-                        # THAT is why we need the buffer! To "prime" the processor if we seek.
-                        # However, for sequential playback, just passing the current frame is enough IF the processor keeps state.
-                        
-                        # Let's stick to the plan: "Pass the required data (single frame or history) to active processors"
-                        # If the processor expects a single cube, we pass a single cube.
-                        # If we need to prime it, we should do that on seek.
-                        # For now, let's pass the current cube.
                         result = processor.process(adc_cube=adc_cube)
                     else:
                         result = processor.process(adc_cube=adc_cube)
@@ -222,6 +233,8 @@ class mmWaveRadarProcessorController(QObject):
 
                 except Exception as exc:
                     self.logger.error("Error processing %s: %s", key, exc)
+            
+            self.frame_processed.emit(frame_idx)
 
         except Exception as exc:
             self.logger.error("Error in process_next_frame: %s", exc)
@@ -255,13 +268,6 @@ class mmWaveRadarProcessorController(QObject):
                 # and accept kwargs from processor_params
                 params = self.processor_params.get(key, {})
                 
-                # Filter params to match __init__ signature?
-                # For now, just pass them and hope for the best or rely on **kwargs if implemented
-                # view_radar_data.py shows explicit args.
-                # We might need a smarter factory if signatures vary wildly.
-                # But let's try passing config_manager and **params.
-                
-                # Special handling for known signatures if needed, or rely on params matching
                 processor = spec.processor_cls(
                     self.config_model.config_manager, **params
                 )
@@ -276,6 +282,9 @@ class mmWaveRadarProcessorController(QObject):
         self.max_history = max_history
         self.adc_buffer = deque(maxlen=max_history)
         self.logger.info("Processors initialized. Max history: %d", max_history)
+        
+        # Show initial frame
+        self.process_next_frame(0)
 
     def load_config(
         self, config_path: str, array_geometry: str = "ods", array_direction: str = "down"
