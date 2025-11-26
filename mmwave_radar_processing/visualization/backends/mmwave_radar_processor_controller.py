@@ -66,12 +66,31 @@ class mmWaveRadarProcessorController(QObject):
             "Controller initialized with registry keys: %s", list(self.registry.keys())
         )
 
+        # Define REPO_ROOT relative to this file
+        # This file is in mmwave_radar_processing/visualization/backends/
+        # So root is 3 levels up
+        self.repo_root = Path(__file__).resolve().parents[3]
+
+        if self.dataset_params_path:
+            # If path is relative, try to find it in gui_configs if not found as is
+            if not Path(self.dataset_params_path).exists():
+                potential_path = self.repo_root / "gui_configs" / self.dataset_params_path
+                if potential_path.exists():
+                    self.dataset_params_path = potential_path
+
         if self.dataset_params_path and Path(self.dataset_params_path).exists():
             self._load_defaults()
 
     def _load_defaults(self) -> None:
         """Load default dataset/config and processor params."""
         self.logger.info("Loading default parameters")
+        
+        if self.processor_params_path:
+             if not Path(self.processor_params_path).exists():
+                potential_path = self.repo_root / "gui_configs" / self.processor_params_path
+                if potential_path.exists():
+                    self.processor_params_path = potential_path
+
         if self.processor_params_path and Path(self.processor_params_path).exists():
             with Path(self.processor_params_path).open("r") as handle:
                 self.processor_params = yaml.safe_load(handle) or {}
@@ -89,7 +108,12 @@ class mmWaveRadarProcessorController(QObject):
         array_direction = dataset_cfg.get("config", {}).get("array_direction", "down")
 
         self.load_dataset(str(dataset_path), dataset_cfg)
+        
+        # Config path handling
         config_path = Path("configs") / config_name
+        if not config_path.is_absolute():
+             config_path = self.repo_root / config_path
+             
         self.load_config(str(config_path), array_geometry, array_direction)
 
     def load_dataset(self, dataset_path: str, params: Optional[Dict[str, Any]] = None) -> None:
@@ -100,6 +124,17 @@ class mmWaveRadarProcessorController(QObject):
             params: Optional dataset parameter mapping.
         """
         self.logger.info("Requested dataset load: %s", dataset_path)
+        
+        # Handle relative paths
+        dpath = Path(dataset_path)
+        if not dpath.is_absolute():
+            # If it starts with ~, expand user
+            if str(dataset_path).startswith("~"):
+                dpath = dpath.expanduser()
+            else:
+                # Otherwise assume relative to repo root
+                dpath = self.repo_root / dpath
+        
         try:
             if params is None and self.dataset_params_path:
                 with Path(self.dataset_params_path).open("r") as handle:
@@ -107,7 +142,7 @@ class mmWaveRadarProcessorController(QObject):
             self.dataset_model = DatasetModel(
                 params=params or {},
                 logger=self.logger,
-                dataset_path_override=Path(dataset_path),
+                dataset_path_override=dpath,
             )
             frame_count = self.dataset_model.frame_count()
             self.logger.info("Dataset loaded: %s", dataset_path)

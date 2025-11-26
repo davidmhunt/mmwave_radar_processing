@@ -19,7 +19,7 @@ sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt update
 ```
 
-3. Install python 3.12 along with the required development dependencies
+3. Install python 3.12 via deadsnakes
 ```
 sudo apt install python3.12 python3.12-dev
 ```
@@ -78,13 +78,13 @@ poetry config virtualenvs.options.system-site-packages true
 #### Installing mmwave_radar_processing
 ```
 cd mmwave_radar_processing
-poetry install #without submodules
-poetry install --with submodules #with submodules
+poetry install --with submodules
 ```
 
 #### Updating mmwave_radar_processing
 If the pyproject.toml file is updated, the poetry installation must also be updated. Use the following commands to update the version of poetry
 ```
+poetry lock
 poetry install
 ```
 
@@ -115,3 +115,24 @@ Note: Since the tests involve GUI components, if you are running in a headless e
 ```bash
 QT_QPA_PLATFORM=offscreen poetry run pytest tests/
 ```
+
+## Launching the GUI
+To launch the GUI, use the `launch_mmwave_viewer.py` script:
+```bash
+poetry run python scripts/launch_mmwave_viewer.py   
+```
+
+### Configuration
+The GUI uses configuration files located in the `gui_configs` directory:
+- `dataset_params.yaml`: Defines the default dataset to load and its associated radar configuration.
+- `processor_params.yaml`: Defines parameters for the various signal processing modules.
+
+### Dataset Paths
+By default, the GUI looks for datasets relative to the project root directory. You can specify a different dataset using the `--dataset-path` argument or by updating `dataset_params.yaml`. Absolute paths are also supported.
+
+### Command Line Arguments
+- `--dataset-params`: Path to dataset parameters YAML (default: `gui_configs/dataset_params.yaml`)
+- `--processor-params`: Path to processor parameters YAML (default: `gui_configs/processor_params.yaml`)
+- `--dataset-path`: Override the dataset path (default: from `dataset_params.yaml`)
+- `--config-name`: Override the radar config file (default: from `dataset_params.yaml`)
+- `--log-level`: Set logging level (default: INFO)

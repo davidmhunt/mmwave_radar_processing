@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-params",
         type=Path,
-        default=Path("mmwave_radar_processing/visualization/configs/dataset_params.yaml"),
+        default=Path("gui_configs/dataset_params.yaml"),
         help="Path to dataset parameters YAML.",
     )
     parser.add_argument(
@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--processor-params",
         type=Path,
-        default=Path("mmwave_radar_processing/visualization/configs/processor_params.yaml"),
+        default=Path("gui_configs/processor_params.yaml"),
         help="Path to processor parameter YAML.",
     )
     parser.add_argument(
@@ -65,12 +65,17 @@ def main() -> None:
     setup_logger(level=level)
     logger = get_logger(__name__)
 
-    with args.dataset_params.open("r") as handle:
-        dataset_params = yaml.safe_load(handle) or {}
+    # Attempt to load dataset params to get defaults
+    dataset_params = {}
+    if args.dataset_params.exists():
+        with args.dataset_params.open("r") as handle:
+            dataset_params = yaml.safe_load(handle) or {}
+    
     dataset_defaults = dataset_params.get("dataset", {})
     config_defaults = dataset_params.get("config", {})
 
-    dataset_path = args.dataset_path or Path(dataset_defaults.get("dataset_path", "/data/RadVel"))
+    # Default to empty string if not found, controller will handle it or error out
+    dataset_path = args.dataset_path or Path(dataset_defaults.get("dataset_path", ""))
     config_name = args.config_name or config_defaults.get("name", "config.cfg")
 
     logger.info("Launching GUI with dataset: %s", dataset_path)

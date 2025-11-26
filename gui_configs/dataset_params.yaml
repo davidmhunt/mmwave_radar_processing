@@ -1,5 +1,5 @@
 dataset:
-  dataset_path: /data/RadVel/CPSL_RadVel_ods_20Hz_1
+  dataset_path: dev_resources/CPSL_RadVel_ods_10Hz_1_sample
   radar_folder: ""
   radar_adc_folder: radar_0_adc
   radar_pc_folder: ""

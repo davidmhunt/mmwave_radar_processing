@@ -29,8 +29,8 @@ def verify_logic():
     registry = get_default_registry(logger=logger)
     
     # Use dataset_params.yaml
-    dataset_params_path = Path("mmwave_radar_processing/visualization/configs/dataset_params.yaml")
-    processor_params_path = Path("mmwave_radar_processing/visualization/configs/processor_params.yaml")
+    dataset_params_path = Path("gui_configs/dataset_params.yaml")
+    processor_params_path = Path("gui_configs/processor_params.yaml")
     
     controller = mmWaveRadarProcessorController(
         registry=registry,
