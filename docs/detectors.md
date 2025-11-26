@@ -1,33 +1,27 @@
-# CFAR Detector Guide (`detectors_full.md`)
+# CFAR Detector Guide
 
 Implementation-focused guide for:
-
 - 1D & 2D **CA-CFAR** (Cell Averaging)
 - 1D & 2D **GO-CFAR** (Greatest-Of)
 - 1D & 2D **SO-CFAR** (Smallest-Of)
 - 1D & 2D **OS-CFAR** (Ordered Statistics)
-
-All equations are written in LaTeX math syntax (`$...$`, `$$...$$`) so math-aware renderers can display them nicely.
-
----
+## **NOTE: THE CURRENT FORMULATION IS A FIRST CUT DEVLEPED WITH THE AID OF GPT, IT WILL BE VERIFIED SOON, BUT HAS NOT YET BEEN VERIFIED FOR MATHEMATICAL CORRECTNESS JUST YET**:
 
 ## 1. Notation and Setup
 
 We assume a post-detection radar magnitude (or power) domain.
 
-- 1D signal (range profile or Doppler cut):  
-  - $x[i]$: value at index $i$, $i = 0, \dots, L-1$.
-- 2D signal (range–Doppler map):  
-  - $X[r, d]$: value at range bin $r$ and Doppler bin $d$, $r = 0,\dots,R-1$, $d = 0,\dots,D-1$.
+- 1D signal (range profile or Doppler cut): $x[i]$, $i = 0, \dots, L-1$.
+- 2D signal (range–Doppler map): $X[r, d]$, $r = 0,\dots,R-1$, $d = 0,\dots,D-1$.
 - CUT (Cell Under Test): the sample being tested for a target.
-- $N_G$: number of **guard cells per side** (1D) or half-width in each dimension (2D).
-- $N_T$: number of **training cells per side** (1D) or half-width (2D).
+- $N_G$: guard cells per side (1D) or guard half-width in each dimension (2D).
+- $N_T$: training cells per side (1D) or training half-width (2D).
 - $P_{FA}$: desired probability of false alarm.
 - $\alpha$: CFAR scaling factor.
 
-Assumption (classical CFAR model):
-- Noise after envelope detection is **exponential** (i.i.d. in training cells).
-- Under $H_0$ (no target), CUT distribution matches training cells.
+Classical CFAR assumptions:
+- Noise after envelope detection is exponential and i.i.d. across training cells.
+- Under $H_0$ (no target), the CUT distribution matches the training cells.
 
 ---
 
@@ -35,50 +29,37 @@ Assumption (classical CFAR model):
 
 ### 2.1 1D CA-CFAR: Math
 
-For CUT at index $i$:
+For a CUT at index $i$:
 
-- Left training region:
-  $$
-  \mathcal{T}_L =
-  \{ x[k] \mid k \in [i - N_G - N_T,\; i - N_G - 1] \}
-  $$
-- Right training region:
-  $$
-  \mathcal{T}_R =
-  \{ x[k] \mid k \in [i + N_G + 1,\; i + N_G + N_T] \}
-  $$
-
-Total training set:
+Left training region:
 $$
-\mathcal{T}_i = \mathcal{T}_L \cup \mathcal{T}_R
+\mathcal{T}_L = \{ x[k] \mid k \in [i - N_G - N_T,\; i - N_G - 1] \}
+$$
+Right training region:
+$$
+\mathcal{T}_R = \{ x[k] \mid k \in [i + N_G + 1,\; i + N_G + N_T] \}
 $$
 
-Number of training cells:
+Training set and size:
 $$
-N = 2 N_T
+\mathcal{T}_i = \mathcal{T}_L \cup \mathcal{T}_R, \qquad N = 2 N_T
 $$
 
-Noise estimate (cell averaging):
+Noise estimate:
 $$
 \hat{Z}_i = \frac{1}{N} \sum_{x[k] \in \mathcal{T}_i} x[k]
 $$
 
-Threshold:
+Threshold and scaling factor:
 $$
-T_i = \alpha \hat{Z}_i
-$$
-
-To achieve a given $P_{FA}$ with exponential noise and CA-CFAR, the scaling factor is:
-$$
+T_i = \alpha \hat{Z}_i, \qquad
 \alpha = N \left( P_{FA}^{-1/N} - 1 \right)
 $$
 
 Decision rule:
 $$
-x[i] > T_i \Rightarrow \text{declare target at } i
+x[i] > T_i \quad \Rightarrow \quad \text{declare target at } i
 $$
-
----
 
 ### 2.2 1D CA-CFAR: Python-Style Pseudocode
 
@@ -125,204 +106,52 @@ def ca_cfar_1d(x, num_guard, num_train, pfa):
         detections[i] = (x[i] > T)
 
     return detections, thresholds
-2.3 2D CA-CFAR: Math
-We now consider a 2D map $X[r,d]$.
+```
 
-Define:
+### 2.3 2D CA-CFAR: Math
 
-Range half-window: $W_r = N_{G,r} + N_{T,r}$
+Consider a 2D map $X[r, d]$.
 
-Doppler half-window: $W_d = N_{G,d} + N_{T,d}$
+Half-window sizes:
+$$
+W_r = N_{G,r} + N_{T,r}, \qquad W_d = N_{G,d} + N_{T,d}
+$$
 
-Total CFAR window size:
+Window sizes:
+$$
+N_{\text{win}} = (2 W_r + 1)(2 W_d + 1)
+$$
+$$
+N_{\text{guard}} = (2 N_{G,r} + 1)(2 N_{G,d} + 1)
+$$
+$$
+N = N_{\text{win}} - N_{\text{guard}}
+$$
 
-𝑁
-win
-=
-(
-2
-𝑊
-𝑟
-+
-1
-)
-(
-2
-𝑊
-𝑑
-+
-1
-)
-N 
-win
-​
- =(2W 
-r
-​
- +1)(2W 
-d
-​
- +1)
-Guard + CUT region size:
-
-𝑁
-guard
-=
-(
-2
-𝑁
-𝐺
-,
-𝑟
-+
-1
-)
-(
-2
-𝑁
-𝐺
-,
-𝑑
-+
-1
-)
-N 
-guard
-​
- =(2N 
-G,r
-​
- +1)(2N 
-G,d
-​
- +1)
-Thus number of training cells:
-
-𝑁
-=
-𝑁
-win
-−
-𝑁
-guard
-N=N 
-win
-​
- −N 
-guard
-​
- 
-For a CUT at $(r, d)$, the training set is:
-
-All cells in the rectangle:
+Training set for CUT at $(r, d)$: all cells in
 $[r - W_r, r + W_r] \times [d - W_d, d + W_d]$
-
-excluding the guard + CUT rectangle:
-$[r - N_{G,r}, r + N_{G,r}] \times [d - N_{G,d}, d + N_{G,d}]$
+excluding the guard + CUT block
+$[r - N_{G,r}, r + N_{G,r}] \times [d - N_{G,d}, d + N_{G,d}]$.
 
 Noise estimate:
+$$
+\hat{Z}_{r,d} = \frac{1}{N} \sum_{(r', d') \in \mathcal{T}_{r,d}} X[r', d']
+$$
 
-𝑍
-^
-𝑟
-,
-𝑑
-=
-1
-𝑁
-∑
-(
-𝑟
-′
-,
-𝑑
-′
-)
-∈
-𝑇
-𝑟
-,
-𝑑
-𝑋
-[
-𝑟
-′
-,
-𝑑
-′
-]
-Z
-^
-  
-r,d
-​
- = 
-N
-1
-​
-  
-(r 
-′
- ,d 
-′
- )∈T 
-r,d
-​
- 
-∑
-​
- X[r 
-′
- ,d 
-′
- ]
-Threshold:
+Threshold and scaling factor (same CA-CFAR formula):
+$$
+T_{r,d} = \alpha \hat{Z}_{r,d}, \qquad
+\alpha = N \left( P_{FA}^{-1/N} - 1 \right)
+$$
 
-𝑇
-𝑟
-,
-𝑑
-=
-𝛼
-𝑍
-^
-𝑟
-,
-𝑑
-T 
-r,d
-​
- =α 
-Z
-^
-  
-r,d
-​
- 
-Scaling factor (same CA-CFAR formula):
+Decision rule:
+$$
+X[r, d] > T_{r,d} \quad \Rightarrow \quad \text{declare target at } (r, d)
+$$
 
-𝛼
-=
-𝑁
-(
-𝑃
-𝐹
-𝐴
-−
-1
-/
-𝑁
-−
-1
-)
-α=N(P 
-FA
-−1/N
-​
- −1)
-2.4 2D CA-CFAR: Python-Style Pseudocode
-python
-Copy code
+### 2.4 2D CA-CFAR: Python-Style Pseudocode
+
+```python
 def ca_cfar_2d(X, num_guard_r, num_guard_d, num_train_r, num_train_d, pfa):
     """
     2D CA-CFAR over a range-Doppler map.
@@ -354,7 +183,7 @@ def ca_cfar_2d(X, num_guard_r, num_guard_d, num_train_r, num_train_d, pfa):
 
     alpha = N * (pfa ** (-1.0 / N) - 1.0)
 
-    # Iterate only where full window fits
+    # iterate only where full window fits
     for r in range(Wr, R - Wr):
         for d in range(Wd, D - Wd):
 
@@ -376,240 +205,43 @@ def ca_cfar_2d(X, num_guard_r, num_guard_d, num_train_r, num_train_d, pfa):
             detections[r][d] = (X[r][d] > T)
 
     return detections, thresholds
-3. GO-CFAR and SO-CFAR (1D)
-GO-CFAR and SO-CFAR improve robustness near clutter edges and strong interferers by using two separate training regions and combining them with max or min.
+```
+
+---
+
+## 3. GO-CFAR and SO-CFAR (1D)
+
+GO-CFAR and SO-CFAR improve robustness near clutter edges or strong interferers by treating the two sides of the window separately and combining the estimates with $\max$ (GO) or $\min$ (SO).
 
 For a CUT at index $i$:
 
-Leading (left) training:
+Left and right training regions:
+$$
+\mathcal{T}_L = \{ x[k] \mid k \in [i - N_G - N_T,\; i - N_G - 1] \}, \quad
+\mathcal{T}_R = \{ x[k] \mid k \in [i + N_G + 1,\; i + N_G + N_T] \}
+$$
 
-𝑇
-𝐿
-=
-𝑥
-[
-𝑖
-−
-𝑁
-𝐺
-−
-𝑁
-𝑇
-:
-𝑖
-−
-𝑁
-𝐺
-]
-T 
-L
-​
- =x[i−N 
-G
-​
- −N 
-T
-​
- :i−N 
-G
-​
- ]
-Lagging (right) training:
+Side averages:
+$$
+Z_L = \frac{1}{N_T} \sum_{x[k] \in \mathcal{T}_L} x[k], \qquad
+Z_R = \frac{1}{N_T} \sum_{x[k] \in \mathcal{T}_R} x[k]
+$$
 
-𝑇
-𝑅
-=
-𝑥
-[
-𝑖
-+
-𝑁
-𝐺
-+
-1
-:
-𝑖
-+
-𝑁
-𝐺
-+
-1
-+
-𝑁
-𝑇
-]
-T 
-R
-​
- =x[i+N 
-G
-​
- +1:i+N 
-G
-​
- +1+N 
-T
-​
- ]
-Averages:
+Noise estimate:
+$$
+\hat{Z}_i^{\text{GO}} = \max(Z_L, Z_R), \qquad
+\hat{Z}_i^{\text{SO}} = \min(Z_L, Z_R)
+$$
 
-𝑍
-𝐿
-=
-1
-𝑁
-𝑇
-∑
-𝑇
-𝐿
-,
-𝑍
-𝑅
-=
-1
-𝑁
-𝑇
-∑
-𝑇
-𝑅
-Z 
-L
-​
- = 
-N 
-T
-​
- 
-1
-​
- ∑T 
-L
-​
- ,Z 
-R
-​
- = 
-N 
-T
-​
- 
-1
-​
- ∑T 
-R
-​
- 
-GO-CFAR (Greatest-Of):
+Threshold (approximate $\alpha$ using one side for calibration):
+$$
+T_i = \alpha \hat{Z}_i, \qquad
+\alpha \approx N_T \left( P_{FA}^{-1/N_T} - 1 \right)
+$$
 
-𝑍
-^
-𝑖
-GO
-=
-max
-⁡
-(
-𝑍
-𝐿
-,
-𝑍
-𝑅
-)
-Z
-^
-  
-i
-GO
-​
- =max(Z 
-L
-​
- ,Z 
-R
-​
- )
-SO-CFAR (Smallest-Of):
+### 3.1 1D GO/SO-CFAR: Python-Style Pseudocode
 
-𝑍
-^
-𝑖
-SO
-=
-min
-⁡
-(
-𝑍
-𝐿
-,
-𝑍
-𝑅
-)
-Z
-^
-  
-i
-SO
-​
- =min(Z 
-L
-​
- ,Z 
-R
-​
- )
-Threshold:
-
-𝑇
-𝑖
-=
-𝛼
-𝑍
-^
-𝑖
-T 
-i
-​
- =α 
-Z
-^
-  
-i
-​
- 
-In theory, $\alpha$ depends on the effective distribution (since you are using max or min of two estimates). In practice, a common approximation is to treat one side as representative for the $P_{FA}$ calibration:
-
-𝛼
-≈
-𝑁
-𝑇
-(
-𝑃
-𝐹
-𝐴
-−
-1
-/
-𝑁
-𝑇
-−
-1
-)
-α≈N 
-T
-​
- (P 
-FA
-−1/N 
-T
-​
- 
-​
- −1)
-and then tune if needed.
-
-3.1 1D GO/SO-CFAR: Python-Style Pseudocode
-python
-Copy code
+```python
 def go_so_cfar_1d(x, num_guard, num_train, pfa, mode="GO"):
     """
     1D GO-CFAR / SO-CFAR.
@@ -653,94 +285,38 @@ def go_so_cfar_1d(x, num_guard, num_train, pfa, mode="GO"):
         detections[i] = (x[i] > T)
 
     return detections, thresholds
-Note: 2D GO-/SO-CFAR variants exist (e.g., splitting windows into near/far or left/right halves), but are less standard. You can adapt the same idea by computing $Z_1, Z_2$ over two subwindows and using $\max$ or $\min$.
+```
 
-4. OS-CFAR (Ordered Statistic CFAR)
-OS-CFAR is more robust in non-homogeneous clutter and multi-target scenarios. Instead of averaging, it uses an order statistic of the training samples.
+Note: 2D GO-/SO-CFAR variants exist (e.g., splitting windows into near/far or left/right halves) but are less standard. Adapt the same idea by computing $Z_1, Z_2$ over two subwindows and using $\max$ or $\min$.
 
-For CUT at index $i$, with training set $\mathcal{T}_i$ of size $N$:
+---
 
-Sort training magnitudes:
+## 4. OS-CFAR (Ordered Statistic CFAR)
 
-𝑧
-(
-1
-)
-≤
-𝑧
-(
-2
-)
-≤
-⋯
-≤
-𝑧
-(
-𝑁
-)
-z 
-(1)
-​
- ≤z 
-(2)
-​
- ≤⋯≤z 
-(N)
-​
- 
-Pick a rank index $k$ (e.g., mid or high rank).
+OS-CFAR is robust in non-homogeneous clutter and multi-target scenarios. Instead of averaging, it uses an order statistic of the training samples.
 
-Use:
+For CUT at index $i$ with training set $\mathcal{T}_i$ of size $N$:
 
-𝑍
-^
-𝑖
-OS
-=
-𝑧
-(
-𝑘
-)
-Z
-^
-  
-i
-OS
-​
- =z 
-(k)
-​
- 
+Sort the training magnitudes:
+$$
+z_{(1)} \le z_{(2)} \le \dots \le z_{(N)}
+$$
+
+Pick a rank $k$ (e.g., mid or high rank) and set
+$$
+\hat{Z}_i^{\text{OS}} = z_{(k)}
+$$
+
 Threshold:
+$$
+T_i = \alpha \hat{Z}_i^{\text{OS}}
+$$
 
-𝑇
-𝑖
-=
-𝛼
-𝑍
-^
-𝑖
-OS
-T 
-i
-​
- =α 
-Z
-^
-  
-i
-OS
-​
- 
-In practice:
+In practice $k$ and $\alpha$ are tuned (often via simulation) to hit the target $P_{FA}$. A common heuristic is $k \approx \lceil \rho N \rceil$ with $\rho \in [0.6, 0.9]$.
 
-$k$ and $\alpha$ are typically tuned via simulation to achieve a target $P_{FA}$.
+### 4.1 1D OS-CFAR: Python-Style Pseudocode
 
-A common heuristic is $k \approx \lceil \rho N \rceil$ with $\rho \in [0.6, 0.9]$.
-
-4.1 1D OS-CFAR: Python-Style Pseudocode
-python
-Copy code
+```python
 def os_cfar_1d(x, num_guard, num_train, k_rank, alpha):
     """
     1D OS-CFAR.
@@ -775,11 +351,13 @@ def os_cfar_1d(x, num_guard, num_train, k_rank, alpha):
         detections[i] = (x[i] > T)
 
     return detections, thresholds
-4.2 2D OS-CFAR: Python-Style Pseudocode
-Same principle, but $\mathcal{T}_{r,d}$ is the 2D training window (excluding guard + CUT), flattened to a list.
+```
 
-python
-Copy code
+### 4.2 2D OS-CFAR: Python-Style Pseudocode
+
+Same principle as 1D, but $\mathcal{T}_{r,d}$ is the 2D training window (excluding guard + CUT) flattened to a list.
+
+```python
 def os_cfar_2d(X, num_guard_r, num_guard_d,
                num_train_r, num_train_d,
                k_rank, alpha):
@@ -830,56 +408,97 @@ def os_cfar_2d(X, num_guard_r, num_guard_d,
             detections[r][d] = (X[r][d] > T)
 
     return detections, thresholds
-5. Practical Implementation Notes
-Linear vs dB:
+```
 
-CFAR formulas assume linear power.
+---
 
-If your data is in dB: convert to linear, run CFAR, optionally convert results back.
+## 5. Practical Implementation Notes
 
-Edges:
+- **Linear vs dB:** CFAR formulas assume linear power. Convert dB data to linear, run CFAR, then convert back if needed.
+- **Edges:** The pseudocode skips indices where the full window does not fit. Alternatives: pad, mirror, or shrink windows near edges.
+- **2D performance:** Nested loops are slow for large maps. Vectorize via convolution/integral images for CA-CFAR or use GPU (PyTorch/CuPy) for scale.
+- **Parameter tuning:** Typical starts: $P_{FA} \in [10^{-2}, 10^{-5}]$, guard cells 1–4/side, training cells 8–32/side (1D). For OS-CFAR, pick $k$ around 60–80% of $N$ and tune $\alpha$ via Monte Carlo.
+- **Sequential vs full 2D:** Applying 1D CFAR along range then Doppler is cheaper but approximate; full 2D CFAR is more robust but heavier.
 
-The pseudocode simply skips indices where the full window does not fit.
+---
 
-Alternatives: pad, mirror, or use smaller windows near edges.
+## 6. Summary
 
-2D Performance:
+- CA-CFAR: average of all training cells; optimal in homogeneous clutter.
+- GO-CFAR: uses the larger side; good near clutter edges.
+- SO-CFAR: uses the smaller side; helps near multiple targets.
+- OS-CFAR: rank-ordered statistic; robust in non-homogeneous clutter.
 
-2D nested loops can be slow for large RD maps.
+---
 
-Possible optimizations:
+## 7. Implementation Plan (Python, `mmwave_radar_processing/detectors`)
 
-Vectorized sums via convolution or integral images (for CA-CFAR).
+### 7.1 Base detector scaffolding
+- Create `BaseCFAR1D` and `BaseCFAR2D` classes (assume magnitude input) handling window geometry, valid-region iteration (no padding/mirroring/shrinking), and storing per-cut thresholds/noise estimates.
+- Expose a `detect(x, **params)` that returns detection index lists (1D: `[i]`, 2D: `[(r, d), ...]`); cache thresholds/noise maps on the instance for later inspection.
+- Implement vectorized/sliding-window extraction: NumPy with `sliding_window_view` or SciPy convolution for sums; compute guard/training masks once per configuration to reuse across calls.
+- Provide common helpers: input validation, guard/training size checks, PFA-to-alpha computation (shared formulas), conversion between threshold maps and index lists, and optional batch mode for 2D if trivially supported.
+- Add optional plotting helpers (matplotlib, behind a separate `plot_detections`/`plot_thresholds` method) that operate on stored masks/thresholds without re-computation.
 
-GPU (PyTorch / CuPy) for large-scale processing.
+### 7.2 Child detector classes (compute thresholds/noise, reuse base)
+- **CA-CFAR 1D/2D**: use mean of training cells; compute $\alpha$ from $P_{FA}$ and training count; thresholds via base helpers.
+- **GO-CFAR 1D**: split left/right training, take `max`; $\alpha$ via single-side approximation; extend to 2D variant only if needed later.
+- **SO-CFAR 1D**: split left/right training, take `min`; same $\alpha$ approach as GO; optional 2D variant similar to GO.
+- **OS-CFAR 1D/2D**: sort training window (or use `np.partition` for efficiency) and pick rank $k$; apply supplied $\alpha$; reuse base windowing/mask logic.
+- Each child defines `compute_thresholds(...)` (or `_estimate_noise(...)`) overriding a base abstract; base handles comparison and output formatting.
 
-Parameter Tuning:
+### 7.3 Examples in Readme/Docs
+- Provide usage snippets in the docstring or README of the detectors module showing typical parameters (guard/train counts, $P_{FA}$) and how to retrieve detection indices and plots.\
 
-Typical starting points:
+### 7.4 Validation (planned, but not implemented)
+- Add lightweight unit tests (pytest) for window sizing, valid-region masking, and numerical thresholds against small synthetic arrays.
 
-$P_{FA} \in [10^{-2}, 10^{-5}]$
 
-Guard cells: 1–4 per side
+# References (From GPT, need to check/confirm these)
 
-Training cells: 8–32 per side (1D); smaller half-widths in 2D but many total cells.
+## Classical CFAR Papers (checked)
 
-For OS-CFAR:
+- Finn, H.M. and Johnson, R.S., **"Adaptive Detection Mode with Threshold Control as a Function of Spatially Sampled Clutter-Level Estimates,"**  
+  *IEEE Transactions on Aerospace and Electronic Systems*, 1968.
 
-Choose $k$ around 60–80% of the sorted list.
+- Rohling, H., **"Radar CFAR Thresholding in Clutter and Multiple Target Situations,"**  
+  *IEEE Transactions on Aerospace and Electronic Systems*, vol. AES-19, no. 4, pp. 608–621, 1983.  
+  (Introduces GO-CFAR and SO-CFAR)
 
-Tune $\alpha$ empirically via Monte Carlo.
+- Weiss, M., **"An Improved Detection Algorithm for Non-Homogeneous Clutter Environments,"**  
+  *IEEE Transactions on Aerospace and Electronic Systems*, 1982.  
+  (Original Ordered-Statistic CFAR)
 
-Sequential vs Full 2D CFAR:
+- Gandhi, P.P. and Kassam, S.A., **"Analysis of CFAR Processors in Nonhomogeneous Background,"**  
+  *IEEE Transactions on Aerospace and Electronic Systems*, vol. AES-24, no. 4, 1988.  
+  (Seminal 2D CFAR analysis)
 
-You can apply CFAR along range and then along Doppler (1D+1D) as an approximation.
+## Radar Signal Processing Textbooks (checked)
 
-Full 2D CFAR is more robust but more expensive.
+- Richards, M.A., **"Fundamentals of Radar Signal Processing,"**  
+  2nd Edition, McGraw-Hill, 2014.  
+  (Clear CFAR derivations + practical examples)
 
-6. Summary
-CA-CFAR: uses average of all training cells; optimal in homogeneous clutter.
+- Richards, M.A., Scheer, J.A., Holm, W.A. (eds.),  
+  **"Principles of Modern Radar: Basic Principles,"**  
+  SciTech Publishing, 2010.  
+  (A standard reference; good chapters on detection theory)
 
-GO-CFAR: uses the larger side; good near clutter edges.
+- Skolnik, M., **"Introduction to Radar Systems,"**  
+  McGraw-Hill, multiple editions.  
+  (Classic; CFAR appears in detection chapters)
 
-SO-CFAR: uses the smaller side; can help in multi-target scenarios.
+## Modern Tutorials and Application Papers (to check)
 
-OS-CFAR: uses a rank-ordered statistic; robust in non-homogeneous clutter.
+- Rohling, H., **"Radar CFAR Thresholding for Automotive Radar,"**  
+  *IEEE AES Systems Magazine*, 2011.  
+  (Useful for FMCW + automotive radar systems)
+
+- Kay, S.M. and Marple, S.L., **"Spectrum Analysis—A Modern Perspective,"**  
+  (Contains useful sections on detection and CFAR in spectral estimation contexts)
+
+- Fa, G. and Kassam, S., **"CFAR Detection in Nonhomogeneous Backgrounds,"**  
+  *IEEE Transactions on Aerospace and Electronic Systems*, 1984.  
+  (Deep analysis of CFAR challenges)
+
+
