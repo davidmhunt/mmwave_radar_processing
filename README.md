@@ -101,3 +101,17 @@ MOVIE_TEMP_DIRECTORY=/path/to/movie/temp/movie_temp_directory
 ANALYZER_TEMP_DIRECTORY=/path/to/temp/analyzer_directory
 ```
 3. Replace the example text with the path to your directory
+
+## Running Tests
+
+To run the unit tests, use the following command:
+
+```bash
+poetry run pytest tests/
+```
+
+Note: Since the tests involve GUI components, if you are running in a headless environment (e.g., SSH without X11 forwarding), you may need to set the `QT_QPA_PLATFORM` environment variable:
+
+```bash
+QT_QPA_PLATFORM=offscreen poetry run pytest tests/
+```

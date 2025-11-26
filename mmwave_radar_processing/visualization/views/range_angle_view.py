@@ -26,8 +26,17 @@ class RangeAngleView(BaseView):
         self.plot.setLabel("left", "Range (m)")
         self.plot.setTitle("Range-Azimuth Heatmap (Polar.)")
         layout.addWidget(self.plot)
+        self.set_colormap("viridis")
 
-    def set_data(self, payload: Dict[str, Any]) -> None:
+    def set_colormap(self, name: str = "viridis") -> None:
+        """Set the colormap for the image item."""
+        try:
+            cmap = pg.colormap.get(name)
+            self.image.setLookupTable(cmap.getLookupTable())
+        except Exception as exc:
+            self.logger.warning("Failed to set colormap %s: %s", name, exc)
+
+    def update_view(self, payload: Dict[str, Any]) -> None:
         """Update the view with new data.
 
         Args:
@@ -39,16 +48,22 @@ class RangeAngleView(BaseView):
         data = np.array(payload.get("data"))
         angle_bins = payload.get("angle_bins")
         range_bins = payload.get("range_bins")
+
         if data.size == 0:
             return
 
-        display = np.flipud(np.copy(data))
+        # Processor usually returns [range, angle].
+        # pyqtgraph expects [x, y] -> [angle, range].
+        # So we transpose.
+        display = data.T
+        
         if self.convert_to_db:
-            display = 20 * np.log10(np.maximum(display, 1e-12))
-            title = "Range-Azimuth Heatmap (dB Polar.)"
+            display = 20 * np.log10(np.maximum(np.abs(display), 1e-12))
         else:
-            title = "Range-Azimuth Heatmap (mag Polar.)"
+            display = np.abs(display)
+            
         self.image.setImage(display, autoLevels=True)
+
         if angle_bins is not None and range_bins is not None:
             self.image.setRect(
                 QRectF(
@@ -58,4 +73,6 @@ class RangeAngleView(BaseView):
                     range_bins[-1] - range_bins[0],
                 )
             )
+
+        title = "Range-Angle Heatmap (dB)" if self.convert_to_db else "Range-Angle Heatmap (mag)"
         self.plot.setTitle(title)

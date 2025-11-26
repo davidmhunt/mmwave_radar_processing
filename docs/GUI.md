@@ -174,8 +174,20 @@ Each entry includes:
 2) ~~Models: dataset/config wrappers, source adapters, basic error handling.~~  
 3) ~~Views (initial five responses) with pyqtgraph widgets and simple controls.~~  
 4) ~~Controller wiring: playback/live loops, processor dispatch, signal plumbing, status updates.~~  
-5) Planned processors/views: add stubs to registry and placeholder views; implement incrementally.  
+5) ~~Planned processors/views: add stubs to registry and placeholder views; implement incrementally.~~  
 6) ~~Logging integration: ensure GUI components use injected loggers; replace any `print` in GUI modules with logger calls.~~  
 7) Video export utility and UI hook.
 8) Threading/performance enhancements (planned after initial pass).  
 9) Polish: presets for colormaps/thresholds, layout persistence, logging pane (future if desired), dB/magnitude toggle wiring.
+
+
+## Current Bugs/requested changes
+1. Added ability to plot in color, but some still in BW. Figure out where this is set so that I can decide what color to use (maybe set it in one of the .yaml files?)
+  - also make range-azimuth, micro-doppler, and doppler-azimuth use color by implementing the set_colormap function in the views
+2. Some plots are not layed out exactly correct. Work with agent on each plot to get the view to display correctly.
+  - doppler-azimuth, range-azimuth, range-doppler, micro-doppler plots, the x and y labels are correct, but the data currently has x and y axes flip. Note that the original plots came in from matplot lib, but pyqtgraph expects data to be transposed (I believe).
+3. On initialization, still default data is loaded. Make sure that once initialized, the 1st frame of data is shown.
+4. As some views require sequential data, if the next requested frame is not 1 greater than the previous frame, then the buffer will have to be re-computed, that processor will have to be re-set (call the processor's reset() function), and recompute the data to the next current frame
+  - Additionally, the buffer storing a history of data should be cleared/reset.
+5. When we hit the max frame, eep the slider at the max frame
+6. When dB/magnitude toggle is changed, the view should be re-computed and re-plotted.

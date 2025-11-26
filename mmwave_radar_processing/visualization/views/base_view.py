@@ -23,13 +23,24 @@ class BaseView(QWidget):
         self.setMinimumSize(200, 150)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
+        self.last_payload: Optional[Dict[str, Any]] = None
+
     def set_data(self, payload: Any) -> None:
         """Update the view with new data.
 
         Args:
             payload: Dictionary emitted by the controller for this view.
         """
-        raise NotImplementedError("Subclasses must implement set_data.")
+        self.last_payload = payload
+        self.update_view(payload)
+
+    def update_view(self, payload: Any) -> None:
+        """Update the actual view widgets. Must be implemented by subclasses.
+
+        Args:
+            payload: Dictionary containing data and metadata.
+        """
+        raise NotImplementedError("Subclasses must implement update_view.")
 
     def update_params(self, **kwargs: Any) -> None:
         """Update runtime parameters for the view.
@@ -45,4 +56,15 @@ class BaseView(QWidget):
         Args:
             enabled: True to convert data to dB before rendering.
         """
-        self.convert_to_db = enabled
+        if self.convert_to_db != enabled:
+            self.convert_to_db = enabled
+            if self.last_payload is not None:
+                self.update_view(self.last_payload)
+
+    def set_colormap(self, name: str = "viridis") -> None:
+        """Set the colormap for the view.
+
+        Args:
+            name: Name of the colormap (e.g., 'viridis', 'magma', 'jet').
+        """
+        pass  # Subclasses should implement if applicable

@@ -124,8 +124,23 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
         try:
             self.controller.dataset_loaded.connect(self._set_frame_count)
+            self.controller.view_update.connect(self._handle_view_update)
+            self.controller.frame_processed.connect(self._update_slider_from_controller)
+            # Connect slider to controller processing
+            self.frame_slider.valueChanged.connect(self.controller.process_next_frame)
+            
+            # Connect playback controls
+            self.play_button.clicked.connect(self.controller.start)
+            self.pause_button.clicked.connect(self.controller.stop)
+            
+            # Check if dataset is already loaded
+            if self.controller.dataset_model:
+                count = self.controller.dataset_model.frame_count()
+                if count > 0:
+                    self._set_frame_count(count)
+                    
         except Exception as exc:
-            self.logger.warning("Could not connect dataset_loaded signal: %s", exc)
+            self.logger.warning("Could not connect signals: %s", exc)
 
     def _handle_view_toggle(self, states: Dict[str, bool]) -> None:
         """Show or hide views based on toggle states."""
@@ -133,6 +148,17 @@ class MainWindow(QMainWindow):
             widget = self.view_widgets.get(key)
             if widget:
                 widget.setVisible(enabled)
+
+    def _handle_view_update(self, key: str, payload: Dict[str, Any]) -> None:
+        """Update a specific view with new data.
+
+        Args:
+            key: Registry key of the view to update.
+            payload: Data payload for the view.
+        """
+        widget = self.view_widgets.get(key)
+        if widget:
+            widget.set_data(payload)
 
     def _set_db_mode(self, enabled: bool) -> None:
         """Toggle dB mode across all views."""
@@ -154,6 +180,13 @@ class MainWindow(QMainWindow):
         if self.frame_slider.value() > maximum:
             self.frame_slider.setValue(maximum)
         self._update_frame_label(self.frame_slider.value())
+
+    def _update_slider_from_controller(self, frame_idx: int) -> None:
+        """Update slider position from controller (e.g. during playback)."""
+        self.frame_slider.blockSignals(True)
+        self.frame_slider.setValue(frame_idx)
+        self.frame_slider.blockSignals(False)
+        self._update_frame_label(frame_idx)
 
     def _populate_placeholder_data(self) -> None:
         """Populate placeholder data so views are immediately visible."""

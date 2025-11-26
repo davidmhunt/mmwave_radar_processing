@@ -75,3 +75,16 @@ class DatasetModel:
         if self.dataset is None:
             return 0
         return getattr(self.dataset, "num_frames", 0)
+
+    def get_adc_data(self, frame_idx: int) -> Optional[Any]:
+        """Get ADC data for a specific frame.
+
+        Args:
+            frame_idx: Index of the frame to retrieve.
+
+        Returns:
+            ADC data cube if available, otherwise None.
+        """
+        if self.dataset is None:
+            return None
+        return self.dataset.get_radar_adc_data(frame_idx)

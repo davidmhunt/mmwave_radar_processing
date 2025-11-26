@@ -28,6 +28,17 @@ class MicroDopplerProcessor(_Processor):
         super().__init__(config_manager)
 
     
+    def reset(self):
+        
+        #reset the micro-doppler response
+        self.micro_doppler_resp = np.zeros(
+            shape=(self.vel_bins.shape[0],self.num_frames_history)
+        )
+
+        super().reset()
+
+        return
+    
     def configure(self):
                 
         self.vel_bins = np.arange(
