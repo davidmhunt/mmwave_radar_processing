@@ -90,10 +90,13 @@ class mmWaveRadarProcessorController(QObject):
                 potential_path = self.repo_root / "gui_configs" / self.processor_params_path
                 if potential_path.exists():
                     self.processor_params_path = potential_path
+        
+                    
 
         if self.processor_params_path and Path(self.processor_params_path).exists():
             with Path(self.processor_params_path).open("r") as handle:
                 self.processor_params = yaml.safe_load(handle) or {}
+                
 
         # Dataset/config params
         with Path(self.dataset_params_path).open("r") as handle:
@@ -175,6 +178,15 @@ class mmWaveRadarProcessorController(QObject):
         if next_frame >= self.dataset_model.frame_count():
             self.logger.info("End of dataset reached")
             self.stop()
+            # Reset to start
+            self.last_processed_frame = -1
+            if self.adc_buffer:
+                self.adc_buffer.clear()
+            for processor in self.processors.values():
+                if hasattr(processor, "reset"):
+                    processor.reset()
+            # Emit frame 0 to reset slider and view
+            self.process_next_frame(0)
             return
 
         self.process_next_frame(next_frame)
@@ -222,15 +234,19 @@ class mmWaveRadarProcessorController(QObject):
                     continue
 
                 processor = self.processors[key]
+                
+                # Load params for this processor
+                params = self.processor_params.get("processors", {}).get(key, {})
+                self.logger.debug("Processor %s params: %s", key, params)
                 try:
                     # Determine input data based on history requirement
                     if spec.num_frames_history > 1:
                         if len(self.adc_buffer) < spec.num_frames_history:
                             # Not enough history yet
                             continue
-                        result = processor.process(adc_cube=adc_cube)
+                        result = processor.process(adc_cube=adc_cube, **params)
                     else:
-                        result = processor.process(adc_cube=adc_cube)
+                        result = processor.process(adc_cube=adc_cube, **params)
 
                     # 5. Emit update
                     # Construct payload matching view's set_data expectation
@@ -301,7 +317,8 @@ class mmWaveRadarProcessorController(QObject):
                 # Instantiate processor
                 # We assume all processors take config_manager as first arg
                 # and accept kwargs from processor_params
-                params = self.processor_params.get(key, {})
+                
+                params = self.processor_params.get("processors", {}).get(key, {})
                 
                 processor = spec.processor_cls(
                     self.config_model.config_manager, **params

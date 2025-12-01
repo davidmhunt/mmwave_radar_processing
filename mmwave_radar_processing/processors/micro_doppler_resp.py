@@ -74,7 +74,7 @@ class MicroDopplerProcessor(_Processor):
         
 
 
-    def process(self, adc_cube: np.ndarray, rx_idx = 0) -> np.ndarray:
+    def process(self, adc_cube: np.ndarray, rx_idx = 0, **kwargs) -> np.ndarray:
 
 
         new_data = adc_cube[rx_idx,:,:]

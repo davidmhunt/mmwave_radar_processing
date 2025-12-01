@@ -72,7 +72,8 @@ class RangeDopplerProcessor(_Processor):
             self,
             adc_cube: np.ndarray,
             rx_idx: int = 0,
-            return_magnitude: bool = True) -> np.ndarray:
+            return_magnitude: bool = True,
+            **kwargs) -> np.ndarray:
 
         """Generate the Range-Doppler response.
 

@@ -781,7 +781,8 @@ class VelocityEstimator(DopplerAzimuthProcessor):
             adc_cube: np.ndarray = np.empty(shape=0),
             points: np.ndarray = np.empty(shape=0),
             altitude: float = 0.0,
-            enable_precise_responses: bool = False) -> np.ndarray:
+            enable_precise_responses: bool = False,
+            **kwargs) -> np.ndarray:
         """
         Compute the velocity response over a range window centered around a given altitude.
 

@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--log-level",
         type=str,
-        default="INFO",
+        default="DEBUG",
         help="Log level: DEBUG, INFO, WARNING, ERROR.",
     )
     return parser.parse_args()
@@ -85,7 +85,7 @@ def main() -> None:
     registry = get_default_registry(logger=logger)
     controller = mmWaveRadarProcessorController(
         registry=registry,
-        logger=logger,
+        logger=None,
         dataset_params_path=args.dataset_params,
         processor_params_path=args.processor_params,
         dataset_override=dataset_path,
@@ -94,7 +94,7 @@ def main() -> None:
     window = MainWindow(
         controller=controller,
         registry=registry,
-        logger=logger,
+        logger=None,
         dataset_path=str(dataset_path),
         config_path=str(Path("configs") / config_name),
         params_path=str(args.processor_params),

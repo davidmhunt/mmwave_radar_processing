@@ -97,7 +97,7 @@ class Altimeter(RangeProcessor):
         else:
             return -1.0
 
-    def process(self, adc_cube: np.ndarray, precise_est_enabled:bool = True) -> np.ndarray:
+    def process(self, adc_cube: np.ndarray, precise_est_enabled:bool = True, **kwargs) -> np.ndarray:
         """
         Process the ADC cube to estimate the altitude (range to ground).
 

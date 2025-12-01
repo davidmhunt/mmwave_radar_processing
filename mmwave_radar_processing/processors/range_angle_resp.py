@@ -65,7 +65,11 @@ class RangeAngleProcessor(_Processor):
 
         return adc_cube_windowed
 
-    def process(self, adc_cube: np.ndarray, chirp_idx = 0, rx_antennas:np.ndarray = np.array([])) -> np.ndarray:
+    def process(self,
+                adc_cube: np.ndarray,
+                chirp_idx = 0,
+                rx_antennas:np.ndarray = np.array([]),
+                **kwargs) -> np.ndarray:
         """_summary_
 
         Args:

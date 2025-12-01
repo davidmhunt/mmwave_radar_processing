@@ -3,6 +3,7 @@ from scipy.signal import ZoomFFT,find_peaks
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
+from typing import Union
 
 class DopplerAzimuthProcessor(_Processor):
     """Process Doppler-azimuth data for radar applications.
@@ -418,11 +419,12 @@ class DopplerAzimuthProcessor(_Processor):
     def process(
             self,
             adc_cube: np.ndarray,
-            rx_antennas: np.ndarray = np.array([]),
-            range_window: np.ndarray = np.array([]),
+            rx_antennas: Union[np.ndarray, list] = [],
+            range_window: Union[np.ndarray, list] = [],
             shift_angle:bool = True,
             use_precise_fft: bool = False,
-            precise_vel_range:np.ndarray = np.array([-0.25,0.25])
+            precise_vel_range:Union[np.ndarray, list] = np.array([-0.25,0.25]),
+            **kwargs
             ) -> np.ndarray:
         """Compute a doppler-azimuth response for the radar
 
@@ -437,6 +439,14 @@ class DopplerAzimuthProcessor(_Processor):
             np.ndarray: doppler-azimuth response indexed by [vel,angle]
             that is the average across all samples
         """
+
+        #convert any lists to numpy arrays
+        if isinstance(rx_antennas, list):
+            rx_antennas = np.array(rx_antennas)
+        if isinstance(range_window, list):
+            range_window = np.array(range_window)
+        if isinstance(precise_vel_range, list):
+            precise_vel_range = np.array(precise_vel_range) 
 
         #specify the antennas to use for computing the response
         if rx_antennas.size > 0:

@@ -151,7 +151,7 @@ class RangeProcessor(_Processor):
             return np.array([]), np.array([])
 
 
-    def process(self, adc_cube: np.ndarray, chirp_idx: int = 0) -> np.ndarray:
+    def process(self, adc_cube: np.ndarray, chirp_idx: int = 0, **kwargs) -> np.ndarray:
         """
         Process the ADC cube to obtain a coarse range response
 

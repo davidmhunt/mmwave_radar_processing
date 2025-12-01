@@ -150,7 +150,8 @@ class StripMapSARProcessor(_Processor):
                 vel_m_per_s:float,
                 sensor_height_m:float = 0.24,
                 rx_index = 0,
-                max_SAR_distance:float = 1.5):
+                max_SAR_distance:float = 1.5,
+                **kwargs):
         
         if self.config_manager.virtual_antennas_enabled:
             adc_cube = self.virtual_array_reformatter.process(

@@ -138,6 +138,10 @@ class MainWindow(QMainWindow):
                 count = self.controller.dataset_model.frame_count()
                 if count > 0:
                     self._set_frame_count(count)
+                else:
+                    self._populate_placeholder_data()
+            else:
+                self._populate_placeholder_data()
                     
         except Exception as exc:
             self.logger.warning("Could not connect signals: %s", exc)

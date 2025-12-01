@@ -190,4 +190,6 @@ Each entry includes:
 - reset the slider to the min frame
 - reset all processors
 - reset the buffer storing a history of adc data
-4. Some processors 
+4. Some processors in the mmwave_radar_processing/processors/ directory take in optional parameters in their process() function (e.g.; the range_angle_resp.py). Currently, the processor_params.yaml file contains optional parameters for both the __init__() and process() functions. All of these parameters are loaded in via the mmwave_Radar_processor_controller.py file's _load_defaults() and _init_processors() functions where the flexible parameter loading has already been enabled for each processors __init__() function. However, the optional parameters for the process() function are not loaded in. To enable this in the process() function, perform the following:
+- for each processor in the mmwave_radar_processing/processors/ directory, add a **kwargs parameter to the process() function allowing it to accept optional parameters
+-then in the mmwave_radar_processor_controller.py file's process_next_frame() function, prior to calling the process() function, load that class's parameters (if available) and additionally pass them to the process() function (see the #TODO: in the mmwave_radar_processor_controller.py file's process_next_frame() function)

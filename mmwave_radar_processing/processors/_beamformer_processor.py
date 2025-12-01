@@ -561,7 +561,7 @@ class _BeamformerProcessor(_Processor):
         
         return new_array_geometry
 
-    def process(self,adc_cube:np.ndarray,current_vel:np.ndarray) -> np.ndarray:
+    def process(self,adc_cube:np.ndarray,current_vel:np.ndarray, **kwargs) -> np.ndarray:
         """Compute the beamformed synthetic response
 
         Args:
