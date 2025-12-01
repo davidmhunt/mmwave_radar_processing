@@ -22,36 +22,44 @@ class GoCFAR1D(BaseCFAR1D):
         thresholds = np.full(L, np.inf)
         noise_estimates = np.zeros(L)
         
+        # Get sliding windows
+        # Shape: (num_windows, window_size)
         try:
             windows = self._get_window_view(x)
         except ValueError:
             return thresholds, noise_estimates
 
         # Split window into Left and Right training regions
-        # Window size = 2*N_T + 2*N_G + 1
-        # Left: [0 : N_T]
-        # Right: [N_T + 2*N_G + 1 : ]
+        # Window structure: [Left Training | Guard Left | CUT | Guard Right | Right Training]
+        # We slice the window view to get the Left and Right parts separately.
         
         left_end = self.num_train
+        # Start of Right Training = (Left Training) + (Guard Left) + (CUT) + (Guard Right)
+        # = N_T + N_G + 1 + N_G = N_T + 2*N_G + 1
         right_start = self.num_train + 2 * self.num_guard + 1
         
+        # Slicing the windows array
+        # left_region shape: (num_windows, num_train)
+        # right_region shape: (num_windows, num_train)
         left_region = windows[:, :left_end]
         right_region = windows[:, right_start:]
         
-        # Compute means of each side
+        # Compute means of each side for all windows
         mean_left = np.mean(left_region, axis=1)
         mean_right = np.mean(right_region, axis=1)
         
-        # GO-CFAR: Take max of the means
+        # GO-CFAR: Take the MAXIMUM of the two means
+        # This helps maintain the threshold at clutter edges (transitions from low to high power).
         noise_est = np.maximum(mean_left, mean_right)
         
         # Alpha calculation
-        # Use N_side (num_train)
+        # Note: We use N_side (num_train) for alpha calculation in GO/SO approximations
+        # because the effective noise estimate is dominated by one side.
         alpha = self.compute_alpha_ca(self.num_train, self.pfa)
         
         computed_thresholds = alpha * noise_est
         
-        # Map back
+        # Map back to full array indices
         cut_idx = self.num_train + self.num_guard
         valid_start = cut_idx
         valid_end = valid_start + len(noise_est)
@@ -86,6 +94,7 @@ class SoCFAR1D(BaseCFAR1D):
         except ValueError:
             return thresholds, noise_estimates
 
+        # Split window into Left and Right training regions
         left_end = self.num_train
         right_start = self.num_train + 2 * self.num_guard + 1
         
@@ -95,11 +104,11 @@ class SoCFAR1D(BaseCFAR1D):
         mean_left = np.mean(left_region, axis=1)
         mean_right = np.mean(right_region, axis=1)
         
-        # SO-CFAR: Take min of the means
+        # SO-CFAR: Take the MINIMUM of the two means
+        # This is useful for resolving closely spaced targets (interfering target in one side doesn't corrupt estimate).
         noise_est = np.minimum(mean_left, mean_right)
         
         # Alpha calculation
-        # Use N_side (num_train)
         alpha = self.compute_alpha_ca(self.num_train, self.pfa)
         
         computed_thresholds = alpha * noise_est

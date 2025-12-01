@@ -52,6 +52,7 @@ class OsCFAR1D(BaseCFAR1D):
         left_region = windows[:, :left_end]
         right_region = windows[:, right_start:]
         
+        # Combine left and right training cells into a single array for each window
         training_cells = np.concatenate((left_region, right_region), axis=1)
         
         # Validate k_rank
@@ -63,7 +64,11 @@ class OsCFAR1D(BaseCFAR1D):
         k_idx = self.k_rank - 1
         
         # Use partition for efficiency (O(N)) instead of sort (O(N log N))
+        # np.partition rearranges the array such that the element at k_idx is in its final sorted position,
+        # all smaller elements are before it, and all larger elements are after it.
         partitioned = np.partition(training_cells, k_idx, axis=1)
+        
+        # Extract the k-th value (noise estimate)
         noise_est = partitioned[:, k_idx]
         
         computed_thresholds = self.alpha * noise_est
@@ -132,6 +137,7 @@ class OsCFAR2D(BaseCFAR2D):
         
         # Extract training cells
         # windows[..., mask] returns (R', D', N_train)
+        # This flattens the last two dimensions (Wr, Wd) into N_train for each window.
         training_cells = windows[..., mask]
         
         N_train = training_cells.shape[-1]
@@ -140,6 +146,7 @@ class OsCFAR2D(BaseCFAR2D):
             
         k_idx = self.k_rank - 1
         
+        # Partition along the last axis (training cells)
         partitioned = np.partition(training_cells, k_idx, axis=-1)
         noise_est = partitioned[..., k_idx]
         

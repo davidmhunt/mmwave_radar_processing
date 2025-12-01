@@ -61,153 +61,6 @@ $$
 x[i] > T_i \quad \Rightarrow \quad \text{declare target at } i
 $$
 
-### 2.2 1D CA-CFAR: Python-Style Pseudocode
-
-```python
-def ca_cfar_1d(x, num_guard, num_train, pfa):
-    """
-    1D CA-CFAR detector.
-
-    Args:
-        x: 1D sequence (list/np.array) of length L
-        num_guard: guard cells on each side of CUT
-        num_train: training cells on each side (beyond guards)
-        pfa: desired probability of false alarm
-
-    Returns:
-        detections: list[bool] of length L (True = detection)
-        thresholds: list[float] of length L (CFAR threshold)
-    """
-    L = len(x)
-    N = 2 * num_train  # total training cells
-    alpha = N * (pfa ** (-1.0 / N) - 1.0)
-
-    detections = [False] * L
-    thresholds = [0.0] * L
-
-    # only indices where full window fits
-    start = num_guard + num_train
-    end = L - (num_guard + num_train)
-
-    for i in range(start, end):
-        left_start = i - num_guard - num_train
-        left_end = i - num_guard
-        right_start = i + num_guard + 1
-        right_end = i + num_guard + 1 + num_train
-
-        left = x[left_start:left_end]
-        right = x[right_start:right_end]
-
-        train_cells = list(left) + list(right)
-        noise_est = sum(train_cells) / len(train_cells)
-
-        T = alpha * noise_est
-        thresholds[i] = T
-        detections[i] = (x[i] > T)
-
-    return detections, thresholds
-```
-
-### 2.3 2D CA-CFAR: Math
-
-Consider a 2D map $X[r, d]$.
-
-Half-window sizes:
-$$
-W_r = N_{G,r} + N_{T,r}, \qquad W_d = N_{G,d} + N_{T,d}
-$$
-
-Window sizes:
-$$
-N_{\text{win}} = (2 W_r + 1)(2 W_d + 1)
-$$
-$$
-N_{\text{guard}} = (2 N_{G,r} + 1)(2 N_{G,d} + 1)
-$$
-$$
-N = N_{\text{win}} - N_{\text{guard}}
-$$
-
-Training set for CUT at $(r, d)$: all cells in
-$[r - W_r, r + W_r] \times [d - W_d, d + W_d]$
-excluding the guard + CUT block
-$[r - N_{G,r}, r + N_{G,r}] \times [d - N_{G,d}, d + N_{G,d}]$.
-
-Noise estimate:
-$$
-\hat{Z}_{r,d} = \frac{1}{N} \sum_{(r', d') \in \mathcal{T}_{r,d}} X[r', d']
-$$
-
-Threshold and scaling factor (same CA-CFAR formula):
-$$
-T_{r,d} = \alpha \hat{Z}_{r,d}, \qquad
-\alpha = N \left( P_{FA}^{-1/N} - 1 \right)
-$$
-
-Decision rule:
-$$
-X[r, d] > T_{r,d} \quad \Rightarrow \quad \text{declare target at } (r, d)
-$$
-
-### 2.4 2D CA-CFAR: Python-Style Pseudocode
-
-```python
-def ca_cfar_2d(X, num_guard_r, num_guard_d, num_train_r, num_train_d, pfa):
-    """
-    2D CA-CFAR over a range-Doppler map.
-
-    Args:
-        X: 2D array-like of shape (R, D)
-        num_guard_r: guard half-width in range
-        num_guard_d: guard half-width in Doppler
-        num_train_r: training half-width in range
-        num_train_d: training half-width in Doppler
-        pfa: desired probability of false alarm
-
-    Returns:
-        detections: 2D list[bool] of shape (R, D)
-        thresholds: 2D list[float] of shape (R, D)
-    """
-    R = len(X)
-    D = len(X[0]) if R > 0 else 0
-
-    Wr = num_guard_r + num_train_r
-    Wd = num_guard_d + num_train_d
-
-    detections = [[False for _ in range(D)] for _ in range(R)]
-    thresholds = [[0.0 for _ in range(D)] for _ in range(R)]
-
-    total_window_cells = (2 * Wr + 1) * (2 * Wd + 1)
-    guard_cells = (2 * num_guard_r + 1) * (2 * num_guard_d + 1)
-    N = total_window_cells - guard_cells
-
-    alpha = N * (pfa ** (-1.0 / N) - 1.0)
-
-    # iterate only where full window fits
-    for r in range(Wr, R - Wr):
-        for d in range(Wd, D - Wd):
-
-            train_vals = []
-            for rr in range(r - Wr, r + Wr + 1):
-                for dd in range(d - Wd, d + Wd + 1):
-
-                    # skip guard + CUT region
-                    if (abs(rr - r) <= num_guard_r and
-                        abs(dd - d) <= num_guard_d):
-                        continue
-
-                    train_vals.append(X[rr][dd])
-
-            noise_est = sum(train_vals) / len(train_vals)
-            T = alpha * noise_est
-
-            thresholds[r][d] = T
-            detections[r][d] = (X[r][d] > T)
-
-    return detections, thresholds
-```
-
----
 
 ## 3. GO-CFAR and SO-CFAR (1D)
 
@@ -239,58 +92,6 @@ T_i = \alpha \hat{Z}_i, \qquad
 \alpha \approx N_T \left( P_{FA}^{-1/N_T} - 1 \right)
 $$
 
-### 3.1 1D GO/SO-CFAR: Python-Style Pseudocode
-
-```python
-def go_so_cfar_1d(x, num_guard, num_train, pfa, mode="GO"):
-    """
-    1D GO-CFAR / SO-CFAR.
-
-    Args:
-        x: 1D sequence
-        num_guard: guard cells each side
-        num_train: training cells each side
-        pfa: desired false alarm probability
-        mode: "GO" or "SO"
-
-    Returns:
-        detections, thresholds
-    """
-    L = len(x)
-    N_side = num_train
-    alpha = N_side * (pfa ** (-1.0 / N_side) - 1.0)
-
-    detections = [False] * L
-    thresholds = [0.0] * L
-
-    start = num_guard + num_train
-    end = L - (num_guard + num_train)
-
-    for i in range(start, end):
-        Lvals = x[i - num_guard - num_train : i - num_guard]
-        Rvals = x[i + num_guard + 1 : i + num_guard + 1 + num_train]
-
-        ZL = sum(Lvals) / len(Lvals)
-        ZR = sum(Rvals) / len(Rvals)
-
-        if mode.upper() == "GO":
-            noise_est = max(ZL, ZR)
-        elif mode.upper() == "SO":
-            noise_est = min(ZL, ZR)
-        else:
-            raise ValueError("mode must be 'GO' or 'SO'")
-
-        T = alpha * noise_est
-        thresholds[i] = T
-        detections[i] = (x[i] > T)
-
-    return detections, thresholds
-```
-
-Note: 2D GO-/SO-CFAR variants exist (e.g., splitting windows into near/far or left/right halves) but are less standard. Adapt the same idea by computing $Z_1, Z_2$ over two subwindows and using $\max$ or $\min$.
-
----
-
 ## 4. OS-CFAR (Ordered Statistic CFAR)
 
 OS-CFAR is robust in non-homogeneous clutter and multi-target scenarios. Instead of averaging, it uses an order statistic of the training samples.
@@ -314,145 +115,54 @@ $$
 
 In practice $k$ and $\alpha$ are tuned (often via simulation) to hit the target $P_{FA}$. A common heuristic is $k \approx \lceil \rho N \rceil$ with $\rho \in [0.6, 0.9]$.
 
-### 4.1 1D OS-CFAR: Python-Style Pseudocode
+## 5. Implementation in `mmwave_radar_processing`
 
+The detectors are implemented in the `mmwave_radar_processing.detectors` module, providing a flexible and efficient Python interface for CFAR detection.
+
+### 5.1 Instantiation
+
+All detector classes follow a consistent instantiation pattern. You must provide the window geometry (training and guard cells) and the desired probability of false alarm ($P_{FA}$).
+
+**Example (1D CA-CFAR):**
 ```python
-def os_cfar_1d(x, num_guard, num_train, k_rank, alpha):
-    """
-    1D OS-CFAR.
+from mmwave_radar_processing.detectors import CaCFAR1D
 
-    Args:
-        x: 1D sequence
-        num_guard: guard cells per side
-        num_train: training cells per side
-        k_rank: 1-based rank index into sorted training cells
-        alpha: scale factor (tuned to get desired PFA)
-
-    Returns:
-        detections, thresholds
-    """
-    L = len(x)
-    detections = [False] * L
-    thresholds = [0.0] * L
-
-    start = num_guard + num_train
-    end = L - (num_guard + num_train)
-
-    for i in range(start, end):
-        left = x[i - num_guard - num_train : i - num_guard]
-        right = x[i + num_guard + 1 : i + num_guard + 1 + num_train]
-        train = sorted(list(left) + list(right))
-
-        idx = max(0, min(len(train) - 1, k_rank - 1))
-        noise_est = train[idx]
-
-        T = alpha * noise_est
-        thresholds[i] = T
-        detections[i] = (x[i] > T)
-
-    return detections, thresholds
+# Instantiate a CA-CFAR detector
+# num_train: 10 cells on each side
+# num_guard: 2 cells on each side
+# pfa: 1e-4
+detector = CaCFAR1D(num_train=10, num_guard=2, pfa=1e-4)
 ```
 
-### 4.2 2D OS-CFAR: Python-Style Pseudocode
-
-Same principle as 1D, but $\mathcal{T}_{r,d}$ is the 2D training window (excluding guard + CUT) flattened to a list.
-
+**Example (2D OS-CFAR):**
 ```python
-def os_cfar_2d(X, num_guard_r, num_guard_d,
-               num_train_r, num_train_d,
-               k_rank, alpha):
-    """
-    2D OS-CFAR on a range-Doppler map.
+from mmwave_radar_processing.detectors import OsCFAR2D
 
-    Args:
-        X: 2D array-like, shape (R, D)
-        num_guard_r: guard half-width (range)
-        num_guard_d: guard half-width (Doppler)
-        num_train_r: training half-width (range)
-        num_train_d: training half-width (Doppler)
-        k_rank: 1-based rank index
-        alpha: scaling factor (tuned)
-
-    Returns:
-        detections, thresholds
-    """
-    R = len(X)
-    D = len(X[0]) if R > 0 else 0
-
-    Wr = num_guard_r + num_train_r
-    Wd = num_guard_d + num_train_d
-
-    detections = [[False for _ in range(D)] for _ in range(R)]
-    thresholds = [[0.0 for _ in range(D)] for _ in range(R)]
-
-    for r in range(Wr, R - Wr):
-        for d in range(Wd, D - Wd):
-
-            vals = []
-            for rr in range(r - Wr, r + Wr + 1):
-                for dd in range(d - Wd, d + Wd + 1):
-
-                    # skip guard + CUT
-                    if (abs(rr - r) <= num_guard_r and
-                        abs(dd - d) <= num_guard_d):
-                        continue
-
-                    vals.append(X[rr][dd])
-
-            vals_sorted = sorted(vals)
-            idx = max(0, min(len(vals_sorted) - 1, k_rank - 1))
-            noise_est = vals_sorted[idx]
-
-            T = alpha * noise_est
-            thresholds[r][d] = T
-            detections[r][d] = (X[r][d] > T)
-
-    return detections, thresholds
+# Instantiate a 2D OS-CFAR detector
+# num_train: (range=8, doppler=4)
+# num_guard: (range=2, doppler=1)
+# k_rank: 50 (rank for ordered statistic)
+# alpha: 3.5 (scaling factor)
+detector = OsCFAR2D(num_train=(8, 4), num_guard=(2, 1), k_rank=50, alpha=3.5)
 ```
 
----
+### 5.2 Key Methods
 
-## 5. Practical Implementation Notes
+- **`detect(x)`**: The primary method for performing detection.
+    - **Input**: A 1D array (for 1D detectors) or 2D array (for 2D detectors) representing the signal magnitude or power.
+    - **Output**: A list of indices where targets are detected. For 1D, this is a list of integers `[i1, i2, ...]`. For 2D, it is a list of tuples `[(r1, d1), (r2, d2), ...]`.
+    - **Side Effects**: Caches the computed thresholds and noise estimates internally.
 
-- **Linear vs dB:** CFAR formulas assume linear power. Convert dB data to linear, run CFAR, then convert back if needed.
-- **Edges:** The pseudocode skips indices where the full window does not fit. Alternatives: pad, mirror, or shrink windows near edges.
-- **2D performance:** Nested loops are slow for large maps. Vectorize via convolution/integral images for CA-CFAR or use GPU (PyTorch/CuPy) for scale.
-- **Parameter tuning:** Typical starts: $P_{FA} \in [10^{-2}, 10^{-5}]$, guard cells 1–4/side, training cells 8–32/side (1D). For OS-CFAR, pick $k$ around 60–80% of $N$ and tune $\alpha$ via Monte Carlo.
-- **Sequential vs full 2D:** Applying 1D CFAR along range then Doppler is cheaper but approximate; full 2D CFAR is more robust but heavier.
+- **`plot_detections(x)`**: A helper method to visualize the results.
+    - **Input**: The same signal array `x` passed to `detect()`.
+    - **Behavior**: Generates a plot (using `matplotlib`) showing the signal, the adaptive threshold, and the detected points.
 
----
+### 5.3 Downstream Usage
 
-## 6. Summary
-
-- CA-CFAR: average of all training cells; optimal in homogeneous clutter.
-- GO-CFAR: uses the larger side; good near clutter edges.
-- SO-CFAR: uses the smaller side; helps near multiple targets.
-- OS-CFAR: rank-ordered statistic; robust in non-homogeneous clutter.
-
----
-
-## 7. Implementation Plan (Python, `mmwave_radar_processing/detectors`)
-
-### 7.1 Base detector scaffolding
-- Create `BaseCFAR1D` and `BaseCFAR2D` classes (assume magnitude input) handling window geometry, valid-region iteration (no padding/mirroring/shrinking), and storing per-cut thresholds/noise estimates.
-- Expose a `detect(x, **params)` that returns detection index lists (1D: `[i]`, 2D: `[(r, d), ...]`); cache thresholds/noise maps on the instance for later inspection.
-- Implement vectorized/sliding-window extraction: NumPy with `sliding_window_view` or SciPy convolution for sums; compute guard/training masks once per configuration to reuse across calls.
-- Provide common helpers: input validation, guard/training size checks, PFA-to-alpha computation (shared formulas), conversion between threshold maps and index lists, and optional batch mode for 2D if trivially supported.
-- Add optional plotting helpers (matplotlib, behind a separate `plot_detections`/`plot_thresholds` method) that operate on stored masks/thresholds without re-computation.
-
-### 7.2 Child detector classes (compute thresholds/noise, reuse base)
-- **CA-CFAR 1D/2D**: use mean of training cells; compute $\alpha$ from $P_{FA}$ and training count; thresholds via base helpers.
-- **GO-CFAR 1D**: split left/right training, take `max`; $\alpha$ via single-side approximation; extend to 2D variant only if needed later.
-- **SO-CFAR 1D**: split left/right training, take `min`; same $\alpha$ approach as GO; optional 2D variant similar to GO.
-- **OS-CFAR 1D/2D**: sort training window (or use `np.partition` for efficiency) and pick rank $k$; apply supplied $\alpha$; reuse base windowing/mask logic.
-- Each child defines `compute_thresholds(...)` (or `_estimate_noise(...)`) overriding a base abstract; base handles comparison and output formatting.
-
-### 7.3 Examples in Readme/Docs
-- Provide usage snippets in the docstring or README of the detectors module showing typical parameters (guard/train counts, $P_{FA}$) and how to retrieve detection indices and plots.\
-
-### 7.4 Validation (planned, but not implemented)
-- Add lightweight unit tests (pytest) for window sizing, valid-region masking, and numerical thresholds against small synthetic arrays.
-
+The output of the `detect()` method is a list of raw indices. These can be used for:
+1. **Target Extraction**: Extracting the precise range or Doppler values corresponding to the detected indices.
+2. **Point Cloud Generation**: Converting (Range, Doppler) tuples into a 3D point cloud (Range, Azimuth, Doppler) if angle-of-arrival processing follows.
+3. **Tracking**: Feeding the detected centroids into a tracker (e.g., Kalman Filter) to maintain target identity over time.
 
 # References (From GPT, need to check/confirm these)
 

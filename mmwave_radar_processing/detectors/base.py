@@ -44,22 +44,23 @@ class BaseCFAR1D(ABC):
         Returns:
             List[int]: List of indices where detections occurred.
         """
+        # Ensure input is a numpy array for efficient operations
         x = np.asarray(x)
         if x.ndim != 1:
             raise ValueError("Input x must be a 1D array.")
 
-        # Compute thresholds (abstract method implemented by subclasses)
+        # Compute thresholds (abstract method implemented by subclasses like CaCFAR1D)
+        # This returns two arrays: the computed thresholds and the noise estimates for each cell.
         self.thresholds, self.noise_estimates = self._compute_thresholds(x)
         
-        # Apply decision rule
-        # Note: We only detect where we have valid thresholds (not inf/nan/0 if uncomputed)
-        # The _compute_thresholds method should handle edges (e.g., set to infinity or 0)
-        # Here we assume 0 or infinity for edges where CFAR cannot be computed.
-        # Typically edges are ignored.
-        
+        # Apply decision rule: Signal > Threshold
+        # This creates a boolean array where True indicates a detection.
+        # Note: We only detect where we have valid thresholds.
+        # The _compute_thresholds method handles edges (e.g., sets them to infinity),
+        # so no detections will occur there.
         self.detections = x > self.thresholds
         
-        # Return indices
+        # Return indices of True values in the boolean array
         return np.where(self.detections)[0].tolist()
 
     def plot_detections(self, x: np.ndarray, title: str = "CFAR Detection", convert_to_dB: bool = False) -> None:
@@ -128,7 +129,11 @@ class BaseCFAR1D(ABC):
         """
         Get a sliding window view of the input x.
         
-        The window size is 2 * (num_train + num_guard) + 1.
+        This method uses numpy's stride_tricks to create a 'view' of the array
+        where each row represents a window. This allows us to vectorize operations
+        over all windows without manually looping or copying data.
+        
+        The window size is 2 * (self.num_train + self.num_guard) + 1.
         
         Args:
             x (np.ndarray): 1D input signal.
@@ -139,12 +144,19 @@ class BaseCFAR1D(ABC):
         window_size = 2 * (self.num_train + self.num_guard) + 1
         if len(x) < window_size:
              raise ValueError(f"Input length {len(x)} is smaller than window size {window_size}.")
+        
+        # sliding_window_view creates a new dimension.
+        # For input [0, 1, 2, 3, 4] and window_size 3:
+        # Output: [[0, 1, 2], [1, 2, 3], [2, 3, 4]]
         return sliding_window_view(x, window_shape=window_size)
 
     @staticmethod
     def compute_alpha_ca(num_train_cells: int, pfa: float) -> float:
         """
         Compute the scaling factor alpha for CA-CFAR.
+        
+        The formula is derived based on the assumption of exponential noise distribution.
+        alpha = N * (P_fa^(-1/N) - 1)
         
         Args:
             num_train_cells (int): Total number of training cells (N).
@@ -200,14 +212,17 @@ class BaseCFAR2D(ABC):
         if X.ndim != 2:
             raise ValueError("Input X must be a 2D array.")
 
+        # Compute thresholds (implemented by subclasses)
         self.thresholds, self.noise_estimates = self._compute_thresholds(X)
+        
+        # Apply decision rule
         self.detections = X > self.thresholds
         
-        # Return indices as list of tuples
+        # Return indices as list of tuples (row, col)
         rows, cols = np.where(self.detections)
         return list(zip(rows, cols))
 
-    def plot_detections(self, X: np.ndarray, title: str = "2D CFAR Detection", convert_to_dB: bool = False) -> None:
+    def plot_detections(self, X: np.ndarray, title: str = "2D CFAR Detection") -> None:
         """
         Plot the 2D signal and detections.
         
@@ -216,7 +231,6 @@ class BaseCFAR2D(ABC):
         Args:
             X (np.ndarray): The input signal that was processed.
             title (str): Title for the plot.
-            convert_to_dB (bool): If True, convert the signal magnitude to dB scale for plotting.
         """
         try:
             import matplotlib.pyplot as plt
@@ -229,14 +243,13 @@ class BaseCFAR2D(ABC):
             print("No detections computed. Run detect() first.")
             return
 
+        # The original plot_detections had convert_to_dB logic.
+        # The instruction removes this parameter and its logic.
+        # So, we'll plot the raw magnitude/power.
         plot_X = X
         xlabel = 'Doppler Index'
         ylabel = 'Range Index'
-        colorbar_label = 'Magnitude'
-
-        if convert_to_dB:
-            plot_X = 20 * np.log10(np.maximum(X, 1e-10))
-            colorbar_label = 'Magnitude (dB)'
+        colorbar_label = 'Magnitude' # Assuming magnitude/power for 2D plots
 
         plt.figure(figsize=(12, 5))
         
