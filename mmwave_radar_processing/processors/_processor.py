@@ -1,6 +1,7 @@
 import numpy as np
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
+from mmwave_radar_processing.logging.logger import get_logger
 
 class _Processor:
     
@@ -14,6 +15,8 @@ class _Processor:
         #variables to track history
         self.history_estimated = []
         self.history_gt = []
+
+        self.logger = get_logger(__name__)
 
         self.configure()
         

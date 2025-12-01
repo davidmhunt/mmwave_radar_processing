@@ -17,7 +17,7 @@ class BaseCFAR1D(ABC):
         noise_estimates (Optional[np.ndarray]): Cached noise estimates from the last detection.
     """
 
-    def __init__(self, num_train: int, num_guard: int, pfa: float):
+    def __init__(self, num_train: int, num_guard: int, pfa: float, **kwargs):
         """
         Initialize the 1D CFAR detector.
 
@@ -25,6 +25,7 @@ class BaseCFAR1D(ABC):
             num_train (int): Number of training cells on each side.
             num_guard (int): Number of guard cells on each side.
             pfa (float): Desired probability of false alarm.
+            **kwargs: Additional keyword arguments.
         """
         self.num_train = num_train
         self.num_guard = num_guard
@@ -181,7 +182,12 @@ class BaseCFAR2D(ABC):
         noise_estimates (Optional[np.ndarray]): Cached noise estimates from the last detection.
     """
 
-    def __init__(self, num_train: Tuple[int, int], num_guard: Tuple[int, int], pfa: float):
+    def __init__(
+            self,
+            num_train: Tuple[int, int],
+            num_guard: Tuple[int, int],
+            pfa: float,
+            **kwargs):
         """
         Initialize the 2D CFAR detector.
 
@@ -189,6 +195,7 @@ class BaseCFAR2D(ABC):
             num_train (Tuple[int, int]): (train_range, train_doppler) half-widths.
             num_guard (Tuple[int, int]): (guard_range, guard_doppler) half-widths.
             pfa (float): Desired probability of false alarm.
+            **kwargs: Additional keyword arguments.
         """
         self.num_train = num_train
         self.num_guard = num_guard

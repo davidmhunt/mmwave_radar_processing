@@ -113,7 +113,8 @@ $$
 T_i = \alpha \hat{Z}_i^{\text{OS}}
 $$
 
-In practice $k$ and $\alpha$ are tuned (often via simulation) to hit the target $P_{FA}$. A common heuristic is $k \approx \lceil \rho N \rceil$ with $\rho \in [0.6, 0.9]$.
+In practice $k$ and $\alpha$ are tuned (often via simulation) to hit the target $P_{FA}$. A common heuristic is to specify a percentile rank $\rho \in [0.6, 0.9]$ such that $k \approx \lceil \rho N \rceil$.
+In this implementation, the user provides $\rho$ directly, and $k$ is calculated internally.
 
 ## 5. Implementation in `mmwave_radar_processing`
 
@@ -141,9 +142,9 @@ from mmwave_radar_processing.detectors import OsCFAR2D
 # Instantiate a 2D OS-CFAR detector
 # num_train: (range=8, doppler=4)
 # num_guard: (range=2, doppler=1)
-# k_rank: 50 (rank for ordered statistic)
+# rho: 0.75 (percentile rank for ordered statistic)
 # alpha: 3.5 (scaling factor)
-detector = OsCFAR2D(num_train=(8, 4), num_guard=(2, 1), k_rank=50, alpha=3.5)
+detector = OsCFAR2D(num_train=(8, 4), num_guard=(2, 1), rho=0.75, alpha=3.5)
 ```
 
 ### 5.2 Key Methods

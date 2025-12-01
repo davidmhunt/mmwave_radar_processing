@@ -7,21 +7,24 @@ class OsCFAR1D(BaseCFAR1D):
     """
     1D Ordered Statistic CFAR (OS-CFAR) detector.
     """
-
-    def __init__(self, num_train: int, num_guard: int, k_rank: int, alpha: float):
+        
+    def __init__(self, num_train: int, num_guard: int, rho: float, alpha: float, **kwargs):
         """
         Initialize the 1D OS-CFAR detector.
 
         Args:
             num_train (int): Number of training cells on each side.
             num_guard (int): Number of guard cells on each side.
-            k_rank (int): 1-based rank index of the training cell to use as noise estimate.
+            rho (float): Percentile rank (0.0 to 1.0) for noise estimation.
             alpha (float): Scaling factor.
+            **kwargs: Additional keyword arguments.
         """
-        # Pass dummy pfa since we use explicit alpha
-        super().__init__(num_train, num_guard, pfa=0.0)
-        self.k_rank = k_rank
+        super().__init__(num_train, num_guard, pfa=0.0, **kwargs)
         self.alpha = alpha
+        
+        N_train_cells = 2 * num_train
+        self.k_rank = int(rho * N_train_cells)
+        self.k_rank = max(1, min(self.k_rank, N_train_cells))
 
     def _compute_thresholds(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -88,19 +91,45 @@ class OsCFAR2D(BaseCFAR2D):
     2D Ordered Statistic CFAR (OS-CFAR) detector.
     """
 
-    def __init__(self, num_train: Tuple[int, int], num_guard: Tuple[int, int], k_rank: int, alpha: float):
+    def __init__(self, num_train: Tuple[int, int], num_guard: Tuple[int, int], rho: float, alpha: float, **kwargs):
         """
         Initialize the 2D OS-CFAR detector.
 
         Args:
             num_train (Tuple[int, int]): (train_range, train_doppler) half-widths.
             num_guard (Tuple[int, int]): (guard_range, guard_doppler) half-widths.
-            k_rank (int): 1-based rank index.
+            rho (float): Percentile rank (0.0 to 1.0) for noise estimation.
             alpha (float): Scaling factor.
+            **kwargs: Additional keyword arguments.
         """
-        super().__init__(num_train, num_guard, pfa=0.0)
-        self.k_rank = k_rank
+        super().__init__(num_train, num_guard, pfa=0.0, **kwargs)
         self.alpha = alpha
+        
+        # Calculate k_rank from rho
+        N_train_window = (2 * (num_train[0] + num_guard[0]) + 1) * (2 * (num_train[1] + num_guard[1]) + 1)
+        N_guard_window = (2 * num_guard[0] + 1) * (2 * num_guard[1] + 1)
+        # Note: The user's formula was:
+        # N_train_window = (2 * (num_train[0] + num_guard[0])) * (2 * (num_train[1] + num_guard[1]))
+        # This seems to miss the +1 for the center cell in the window calculation if it's meant to be the full window size.
+        # However, the window size in _get_window_view is 2*(T+G)+1.
+        # Let's stick to the user's logic but ensure it matches the actual number of training cells.
+        # Actual number of training cells = Total Window Cells - Guard/CUT Cells
+        # Total Window = (2*(Tr+Gr)+1) * (2*(Td+Gd)+1)
+        # Guard/CUT Block = (2*Gr+1) * (2*Gd+1)
+        # N_train_cells = Total - Guard/CUT
+        
+        win_r = 2 * (num_train[0] + num_guard[0]) + 1
+        win_d = 2 * (num_train[1] + num_guard[1]) + 1
+        total_cells = win_r * win_d
+        
+        guard_cut_r = 2 * num_guard[0] + 1
+        guard_cut_d = 2 * num_guard[1] + 1
+        guard_cut_cells = guard_cut_r * guard_cut_d
+        
+        N_train_cells = total_cells - guard_cut_cells
+        
+        self.k_rank = int(rho * N_train_cells)
+        self.k_rank = max(1, min(self.k_rank, N_train_cells))
 
     def _compute_thresholds(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """

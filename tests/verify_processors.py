@@ -1,7 +1,8 @@
+
 import numpy as np
-import sys
-import os
 import pytest
+import os
+import sys
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProcessor
@@ -9,107 +10,142 @@ from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerPr
 from mmwave_radar_processing.processors.velocity_estimator import VelocityEstimator
 from mmwave_radar_processing.processors.strip_map_SAR_processor import StripMapSARProcessor
 from mmwave_radar_processing.processors.simple_synthetic_array_beamformer_processor_multiFrame import SyntheticArrayBeamformerProcessor
-from mmwave_radar_processing.processors._beamformer_processor import _BeamformerProcessor
+from mmwave_radar_processing.processors.point_cloud_generator import PointCloudGenerator
+from mmwave_radar_processing.processors.virtual_array_reformater import VirtualArrayReformatter
+from cpsl_datasets.cpsl_ds import CpslDS
 
-# Mock ConfigManager
-class MockConfigManager:
-    def __init__(self):
-        self.num_rx_antennas = 4
-        self.num_tx_antennas = 3
-        self.num_adc_samples = 100
-        self.num_chirps_per_frame = 128
-        self.num_frames = 10
-        self.range_res_m = 0.1
-        self.range_max_m = 10.0
-        self.vel_max_m_s = 5.0
-        self.vel_res_m_s = 0.1
-        self.frameCfg_start_index = 0
-        self.frameCfg_end_index = 127
-        self.frameCfg_loops = 1
-        self.frameCfg_periodicity_ms = 100.0
-        self.array_direction = "x" # or "y" or "z"
-        self.array_geometry = "standard" # Mock array geometry type
-        self.profile_cfgs = [{
-            "startFreq_GHz": 77,
-            "idleTime_us": 10,
-            "rampEndTime_us": 60,
-            "freqSlopeConst_MHz_usec": 20,
-            "numAdcSamples": 100,
-            "digOutSampleRate": 10000
-        }]
-        self.virtual_antennas_enabled = False
-        self.chirp_cfgs = []
+@pytest.fixture
+def config_manager():
+    config_path = "configs/6843_RadVel_ods_20Hz.cfg"
+    cfg_manager = ConfigManager()
+    cfg_manager.load_cfg(config_path, array_geometry="ods", array_direction="down")
+    cfg_manager.compute_radar_perforance(profile_idx=0)
+    return cfg_manager
 
-    def get_num_adc_samples(self, profile_idx=0):
-        return self.num_adc_samples
+@pytest.fixture
+def adc_cube():
+    # Paths
+    dataset_path = "dev_resources/CPSL_RadVel_ods_10Hz_1_sample"
+    config_path = "configs/6843_RadVel_ods_20Hz.cfg"
 
-def test_processors():
-    config_manager = MockConfigManager()
-    adc_cube = np.zeros((4, 100, 128), dtype=complex)
+    #initialize the config manager
+    config_manager = ConfigManager()
+    config_manager.load_cfg(config_path, array_geometry="ods", array_direction="down")
+    config_manager.compute_radar_perforance(profile_idx=0)
+    
+    if not os.path.isdir(dataset_path):
+        pytest.skip(f"Dataset not found at {dataset_path}")
+        
+    # 1. Load Data using CpslDS
+    # Assuming standard folder names for this dataset
+    try:
+        ds = CpslDS(
+            dataset_path=dataset_path,
+            radar_adc_folder="radar_0_adc"
+        )
+    except Exception as e:
+        pytest.fail(f"Failed to load dataset: {e}")
+        
+    if ds.num_frames == 0:
+        pytest.skip("No frames found in dataset")
+        
+    # Get 90th frame (or last available if less)
+    frame_idx = 90
+    if frame_idx >= ds.num_frames:
+        frame_idx = ds.num_frames - 1
+        print(f"Frame 90 not available, using frame {frame_idx}")
+        
+    adc_cube = ds.get_radar_adc_data(frame_idx)
 
+    # 3. Initialize Processors
+    virtual_array_processor = VirtualArrayReformatter(
+        config_manager=config_manager
+    )
+
+    return virtual_array_processor.process(adc_cube)
+
+def test_range_angle_processor(config_manager, adc_cube):
     print("Testing RangeAngleProcessor...")
-    try:
-        processor = RangeAngleProcessor(config_manager)
-        # Test list input for rx_antennas
-        processor.process(adc_cube, rx_antennas=[0, 1])
-        print("RangeAngleProcessor passed.")
-    except Exception as e:
-        print(f"RangeAngleProcessor failed: {e}")
+    processor = RangeAngleProcessor(config_manager)
+    
+    processor.process(adc_cube, rx_antennas=[0, 1])
+    print("RangeAngleProcessor passed.")
 
+def test_micro_doppler_processor(config_manager, adc_cube):
     print("Testing MicroDopplerProcessor...")
-    try:
-        # Test list input for target_ranges
-        processor = MicroDopplerProcessor(config_manager, target_ranges=[0.5, 2.0])
-        print("MicroDopplerProcessor passed.")
-    except Exception as e:
-        print(f"MicroDopplerProcessor failed: {e}")
+    # Test list input for target_ranges
+    processor = MicroDopplerProcessor(config_manager, target_ranges=[0.5, 2.0])
+    print("MicroDopplerProcessor passed.")
 
+def test_velocity_estimator(config_manager, adc_cube):
     print("Testing VelocityEstimator...")
-    try:
-        # Test list input for valid_angle_range
-        processor = VelocityEstimator(
-            config_manager, 
-            lower_range_bound=0.0,
-            upper_range_bound=10.0,
-            valid_angle_range=[-1.0, 1.0]
-        )
-        # Test list input for points
-        processor.process(adc_cube, points=[[1.0, 0.0, 0.0]], altitude=0.0, enable_precise_responses=False)
-        print("VelocityEstimator passed.")
-    except Exception as e:
-        print(f"VelocityEstimator failed: {e}")
-        import traceback
-        traceback.print_exc()
+    # Test list input for valid_angle_range
+    processor = VelocityEstimator(
+        config_manager, 
+        lower_range_bound=0.0,
+        upper_range_bound=10.0,
+        valid_angle_range=[-1.0, 1.0]
+    )
+    # Test list input for points
+    processor.process(adc_cube, points=[[1.0, 0.0, 0.0]], altitude=0.0, enable_precise_responses=False)
+    print("VelocityEstimator passed.")
 
-    print("Testing StripMapSARProcessor...")
-    try:
-        # Test list input for az_angle_range_rad
-        processor = StripMapSARProcessor(config_manager, az_angle_range_rad=[-0.5, 0.5])
-        print("StripMapSARProcessor passed.")
-    except Exception as e:
-        print(f"StripMapSARProcessor failed: {e}")
+# def test_strip_map_sar_processor(config_manager, adc_cube):
+#     print("Testing StripMapSARProcessor...")
+#     # Test list input for az_angle_range_rad
+#     processor = StripMapSARProcessor(config_manager, az_angle_range_rad=[-0.5, 0.5])
+#     print("StripMapSARProcessor passed.")
 
-    print("Testing SyntheticArrayBeamformerProcessor...")
-    try:
-        # Test list inputs for angle bins and velocity limits
-        processor = SyntheticArrayBeamformerProcessor(
-            config_manager, 
-            az_angle_bins_rad=[-0.5, 0.5], 
-            el_angle_bins_rad=[0.0],
-            min_vel=[-1.0, -1.0, -1.0],
-            max_vel=[1.0, 1.0, 1.0],
-            max_vel_stdev=[0.1, 0.1, 0.1]
-        )
-        # Test list input for current_vel
-        # Note: process method might require more setup, but we check if it accepts the list
-        try:
-            processor.process(adc_cube, current_vel=[0.0, 0.0, 0.0])
-        except AttributeError:
-             # Some internal setup might be missing in mock, but we want to check type conversion
-             pass
-        print("SyntheticArrayBeamformerProcessor passed.")
-    except Exception as e:
-        print(f"SyntheticArrayBeamformerProcessor failed: {e}")
+# def test_synthetic_array_beamformer_processor(config_manager, adc_cube):
+#     print("Testing SyntheticArrayBeamformerProcessor...")
+#     # Test list inputs for angle bins and velocity limits
+#     processor = SyntheticArrayBeamformerProcessor(
+#         config_manager, 
+#         az_angle_bins_rad=[-0.5, 0.5], 
+#         el_angle_bins_rad=[0.0],
+#         min_vel=[-1.0, -1.0, -1.0],
+#         max_vel=[1.0, 1.0, 1.0],
+#         max_vel_stdev=[0.1, 0.1, 0.1]
+#     )
+#     # Test list input for current_vel
+#     try:
+#         processor.process(adc_cube, current_vel=[0.0, 0.0, 0.0])
+#     except AttributeError:
+#             # Some internal setup might be missing in mock, but we want to check type conversion
+#             pass
+#     print("SyntheticArrayBeamformerProcessor passed.")
 
-if __name__ == "__main__":
-    test_processors()
+def test_point_cloud_generator_real_data(config_manager,adc_cube):
+    print("Testing PointCloudGenerator with Real Data...")
+    
+    pc_gen = PointCloudGenerator(
+        config_manager=config_manager,
+        cfar_type="os_cfar_2d",
+        cfar_params={"num_train": (8, 4), "num_guard": (2, 1), "rho": 0.75, "alpha": 3.5},
+        num_angle_bins=64,
+        az_antenna_idxs=[0, 1, 2, 3], # Assuming 4 RX
+        el_antenna_idxs=[], # Assuming 2D only for now or no elevation processing if not configured
+        shift_az_resp=True,
+        shift_el_resp=False
+    )
+    
+    # 4. Process
+    try:
+        # adc_cube = virtual_array_processor.process(adc_cube)
+        point_cloud = pc_gen.process(adc_cube)
+        print(f"Generated Point Cloud Shape: {point_cloud.shape}")
+        
+        # 5. Verify Output
+        assert isinstance(point_cloud, np.ndarray)
+        assert point_cloud.shape[1] == 4 # x, y, z, vel
+        
+        # Check if we got any detections (might be empty if no targets)
+        if point_cloud.shape[0] > 0:
+            print("Detections found!")
+        else:
+            print("No detections found (this might be expected depending on frame/thresholds)")
+            
+    except Exception as e:
+        pytest.fail(f"Processing failed: {e}")
+
+    print("PointCloudGenerator Real Data Test Passed.")

@@ -13,6 +13,7 @@ The following table summarizes the current status of each processor, its compati
 | **RangeAngleProcessor** | `range_angle_view` | None |
 | **DopplerAzimuthProcessor** | `doppler_azimuth_view` | Investigate scaling factor in zoom FFT. |
 | **MicroDopplerProcessor** | `micro_doppler_view` | None |
+| **PointCloudProcessor** | None | Implementation pending |
 | **Altimeter** | None | None |
 | **VelocityEstimator** | None | Robust filtering, Standard array elevation support, ODS point-based estimation. |
 | **SyntheticArrayBeamformer** | None | Azimuth selection for interpolation, Calibration improvements. |
@@ -187,6 +188,32 @@ Generates a micro-Doppler spectrogram (Velocity vs. Time) by stacking Doppler re
     processor = MicroDopplerProcessor(config_manager)
     spectrogram = processor.process(adc_cube)
     ```
+
+### PointCloudGenerator
+**File**: `processors/point_cloud_generator.py`
+
+Implements a standard radar signal processing pipeline to generate a 3D point cloud from raw ADC data. This typically involves range processing, Doppler processing, CFAR detection, and angle estimation.
+
+*   **Essential Functions**:
+    *   `process(adc_cube)`: Executes the full processing chain and returns the point cloud.
+
+*   **Parameters**:
+    *   `__init__`:
+        *   `config_manager` (ConfigManager): Radar configuration manager.
+        *   `**kwargs`: Additional keyword arguments.
+    *   `process`:
+        *   `adc_cube` (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps) ADC cube.
+        *   `**kwargs`: Additional keyword arguments.
+
+*   **Usage**:
+    ```python
+    processor = PointCloudProcessor(config_manager)
+    point_cloud = processor.process(adc_cube)
+    ```
+*   **Changes to make**
+
+*   **Implementation Notes/Plan**
+
 
 ### Altimeter
 **File**: `processors/altimeter.py`
