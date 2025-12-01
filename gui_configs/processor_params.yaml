@@ -13,9 +13,9 @@ processors:
     num_angle_bins: 64
     valid_angle_range: [-1.04719755, 1.04719755]
     min_zoom_fft_vel_span: 0.1
-    rx_antennas: [0,3,4,7]
+    rx_antennas: [4,5,8,9]
     range_window: [0.9,2.0]
-    shift_angle: true
+    shift_angle: false
     use_precise_fft: false
     precise_vel_range: [-0.25, 0.25]
   range_resp:
