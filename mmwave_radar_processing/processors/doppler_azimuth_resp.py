@@ -18,7 +18,8 @@ class DopplerAzimuthProcessor(_Processor):
             num_angle_bins:int = 64,
             valid_angle_range: np.ndarray = np.array(
                 [np.deg2rad(-60), np.deg2rad(60)]),
-            min_zoom_fft_vel_span = 0.1) -> None:
+            min_zoom_fft_vel_span = 0.1,
+            **kwargs) -> None:
 
         #range bins
         self.num_range_bins = None

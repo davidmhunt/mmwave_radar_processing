@@ -192,7 +192,7 @@ class mmWaveRadarProcessorController(QObject):
         try:
             # Check for seek/discontinuity
             if frame_idx != self.last_processed_frame + 1:
-                self.logger.info("Seek detected: %d -> %d. Resetting buffer.", self.last_processed_frame, frame_idx)
+                self.logger.debug("Seek detected: %d -> %d. Resetting buffer.", self.last_processed_frame, frame_idx)
                 if self.adc_buffer:
                     self.adc_buffer.clear()
                 # Reset processors if they have state

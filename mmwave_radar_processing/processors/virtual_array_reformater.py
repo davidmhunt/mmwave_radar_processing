@@ -5,7 +5,7 @@ from mmwave_radar_processing.processors._processor import _Processor
 
 class VirtualArrayReformatter(_Processor):
 
-    def __init__(self, config_manager: ConfigManager) -> None:
+    def __init__(self, config_manager: ConfigManager, **kwargs) -> None:
 
         #array to keep track of the chirp_cfg index for each chirp in the ADC config
         self.chirp_cfg_idxs:np.ndarray = None
@@ -35,7 +35,7 @@ class VirtualArrayReformatter(_Processor):
 
         return
     
-    def process(self, adc_cube: np.ndarray) -> np.ndarray:
+    def process(self, adc_cube: np.ndarray, **kwargs) -> np.ndarray:
 
         #initialize a new array that will align all chirps in the same frame
         out_array = np.zeros(

@@ -9,7 +9,8 @@ class MicroDopplerProcessor(_Processor):
             self,
             config_manager: ConfigManager,
             target_ranges:np.ndarray = [0,1.0],
-            num_frames_history:int = 20) -> None:
+            num_frames_history:int = 20,
+            **kwargs) -> None:
 
         #velocity bins
         self.vel_bins:np.ndarray = None

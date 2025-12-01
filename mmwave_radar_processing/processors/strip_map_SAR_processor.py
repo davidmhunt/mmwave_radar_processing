@@ -10,7 +10,8 @@ class StripMapSARProcessor(_Processor):
     def __init__(self,
                  config_manager,
                  az_angle_range_rad:np.ndarray = \
-                    np.deg2rad(np.array([-30,30]))):
+                    np.deg2rad(np.array([-30,30])),
+                 **kwargs):
         
         #virtual array re-formatter (for handling virtual arrays)
         if config_manager.virtual_antennas_enabled:

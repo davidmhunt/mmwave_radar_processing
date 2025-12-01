@@ -9,7 +9,8 @@ class Altimeter(RangeProcessor):
             min_altitude_m: float,
             zoom_search_region_m: float,
             altitude_search_limit_m: float,
-            range_bias: float = 0.0) -> None:
+            range_bias: float = 0.0,
+            **kwargs) -> None:
         """
         Args:
             config_manager (ConfigManager): Radar configuration manager.

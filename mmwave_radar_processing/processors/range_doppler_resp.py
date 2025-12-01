@@ -11,7 +11,8 @@ class RangeDopplerProcessor(_Processor):
 
     def __init__(
             self,
-            config_manager: ConfigManager) -> None:
+            config_manager: ConfigManager,
+            **kwargs) -> None:
 
         """Initialize the processor and set up bin containers.
 

@@ -11,11 +11,10 @@ class RangeProcessor(_Processor):
     Inherits from _Processor. Uses a simple range FFT on a selected RX channel.
     Supports virtual antennas if enabled in the config.
     """
-    def __init__(self, config_manager: ConfigManager):
+    def __init__(self, config_manager: ConfigManager, **kwargs):
         """
         Args:
             config_manager (ConfigManager): Radar configuration manager.
-            rx_idx (int, optional): RX channel index to use for altitude estimation. Defaults to 0.
         """
         self.num_range_bins = None
         self.range_bins = None

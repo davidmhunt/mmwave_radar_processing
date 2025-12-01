@@ -22,8 +22,8 @@ class VelocityEstimator(DopplerAzimuthProcessor):
             peak_threshold_dB: float = 30.0,
             x_measurement_only: bool = False,
             min_R2_threshold: float = 0.6,
-            min_inlier_percent: float = 0.75
-        ) -> None:
+            min_inlier_percent: float = 0.75,
+            **kwargs) -> None:
         """
         Initialize the VelocityEstimator class.
 

@@ -182,12 +182,12 @@ Each entry includes:
 
 
 ## Current Bugs/requested changes
-1. Added ability to plot in color, but some still in BW. Figure out where this is set so that I can decide what color to use (maybe set it in one of the .yaml files?)
-  - also make range-azimuth, micro-doppler, and doppler-azimuth use color by implementing the set_colormap function in the views
-2. Some plots are not layed out exactly correct. Work with agent on each plot to get the view to display correctly.
-  - doppler-azimuth, range-azimuth, range-doppler, micro-doppler plots, the x and y labels are correct, but the data currently has x and y axes flip. Note that the original plots came in from matplot lib, but pyqtgraph expects data to be transposed (I believe).
-3. On initialization, still default data is loaded. Make sure that once initialized, the 1st frame of data is shown.
-4. As some views require sequential data, if the next requested frame is not 1 greater than the previous frame, then the buffer will have to be re-computed, that processor will have to be re-set (call the processor's reset() function), and recompute the data to the next current frame
-  - Additionally, the buffer storing a history of data should be cleared/reset.
-5. When we hit the max frame, eep the slider at the max frame
-6. When dB/magnitude toggle is changed, the view should be re-computed and re-plotted.
+1. On initialization, as a backup, use the main_window.py's populate_placeholder_data function if a dataset fails to load. 
+2. For views that require multiple frames, if the next requested frame is not 1 greater than the previous frame, reset the processor and reset the buffer storing a history of adc data.
+- The view should still display data (even on the 0th frame), but it will just not be complete
+- Additionally, the buffer storing a history of data should be cleared/reset.
+3. When we hit the max frame, do the following:
+- reset the slider to the min frame
+- reset all processors
+- reset the buffer storing a history of adc data
+4. Some processors 

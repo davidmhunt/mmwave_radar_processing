@@ -6,7 +6,8 @@ class _Processor:
     
     def __init__(
             self,
-            config_manager:ConfigManager) -> None:
+            config_manager:ConfigManager,
+            **kwargs) -> None:
         
         self.config_manager = config_manager
         

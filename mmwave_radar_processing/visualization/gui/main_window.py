@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
         self.grid_layout: Optional[QGridLayout] = None
         self.views_container: Optional[QWidget] = None
         self._init_ui()
-        self._populate_placeholder_data()
+        self.controller.process_next_frame(0)
 
     def _init_ui(self) -> None:
         """Initialize the UI layout."""

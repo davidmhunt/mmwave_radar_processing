@@ -27,7 +27,8 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             max_vel_stdev:np.ndarray=np.array([0.1,0.1,0.1]),
             enable_calibration:bool = False,
             num_calibration_iters:int = 1,
-            interpolated_grid_resolution_m=0.1) -> None:
+            interpolated_grid_resolution_m=0.1,
+            **kwargs) -> None:
         """Initialize the SyntheticArrayBeamformerProcessor.
 
         Args:

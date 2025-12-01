@@ -8,7 +8,8 @@ class RangeAngleProcessor(_Processor):
     def __init__(
             self,
             config_manager: ConfigManager,
-            num_angle_bins:int = 64) -> None:
+            num_angle_bins:int = 64,
+            **kwargs) -> None:
 
         #phase shifts
         self.num_angle_bins = num_angle_bins
