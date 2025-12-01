@@ -78,14 +78,15 @@ class RangeDopplerProcessor(_Processor):
         """Generate the Range-Doppler response.
 
         Args:
-            adc_cube: Raw ADC data cube with shape (n_rx, n_range_bins, n_chirps).
-            rx_idx: Antenna index to return. Use -1 to return responses for all
-                antennas instead of a specific one.
-            return_magnitude: If True, return the magnitude response via ``np.abs``;
-                otherwise return the complex FFT output.
+            adc_cube (np.ndarray): Raw ADC data cube with shape (n_rx, n_range_bins, n_chirps).
+            rx_idx (int, optional): Antenna index to return. Use -1 to return responses for all
+                antennas instead of a specific one. Defaults to 0.
+            return_magnitude (bool, optional): If True, return the magnitude response via ``np.abs``;
+                otherwise return the complex FFT output. Defaults to True.
+            **kwargs: Additional keyword arguments.
 
         Returns:
-            Range-Doppler response. If ``rx_idx`` is non-negative, the output
+            np.ndarray: Range-Doppler response. If ``rx_idx`` is non-negative, the output
             shape is (n_range_bins, n_chirps). If ``rx_idx`` is -1, the output
             shape is (n_rx, n_range_bins, n_chirps). Complex or magnitude is
             determined by ``return_magnitude``.

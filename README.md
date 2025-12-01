@@ -72,7 +72,7 @@ export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 
 Finally, make sure that poetry is installing everything into the environment (i.e. not using system packages)
 ```
-poetry config virtualenvs.options.system-site-packages true
+poetry config virtualenvs.options.system-site-packages false
 ```
 
 #### Installing mmwave_radar_processing

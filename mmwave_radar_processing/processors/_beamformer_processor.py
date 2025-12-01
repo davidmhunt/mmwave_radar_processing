@@ -6,7 +6,6 @@ from scipy.interpolate import griddata
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
-from mmwave_radar_processing.detectors.CFAR import CaCFAR_1D
 
 class _BeamformerProcessor(_Processor):
 
@@ -24,11 +23,17 @@ class _BeamformerProcessor(_Processor):
             config_manager (ConfigManager): The configuration manager for radar settings.
             az_angle_bins_rad (np.ndarray, optional): Azimuth angle bins in radians. Defaults to 
                 np.deg2rad(np.linspace(start=-30, stop=30, num=60)).
-            el_angle_bins_rad (np.ndarray, optional): Elevation angle bins in radians. Defaults to 
+            el_angle_bins_rad (np.ndarray | list, optional): Elevation angle bins in radians. Defaults to 
                 np.array([0]).
         Notes:
             NOTE: Coordinate frames are defined as (x - forward, y - left, z - up).
         """
+        
+        # Convert lists to numpy arrays if necessary
+        if isinstance(az_angle_bins_rad, list):
+            az_angle_bins_rad = np.array(az_angle_bins_rad)
+        if isinstance(el_angle_bins_rad, list):
+            el_angle_bins_rad = np.array(el_angle_bins_rad)
 
         #derrived configuration parameters
         self.chirps_per_frame:int = None
@@ -561,15 +566,23 @@ class _BeamformerProcessor(_Processor):
         
         return new_array_geometry
 
-    def process(self,adc_cube:np.ndarray,current_vel:np.ndarray, **kwargs) -> np.ndarray:
-        """Compute the beamformed synthetic response
+    def process(self,adc_cube:np.ndarray,current_vel:np.ndarray | list, **kwargs) -> np.ndarray:
+        """Compute the beamformed synthetic response.
 
         Args:
-            adc_cube (np.ndarray): the adc cube for the synthetic array
-                indexed by [receiver, sample, and chirp]
+            adc_cube (np.ndarray): The adc cube for the synthetic array
+                indexed by [receiver, sample, and chirp].
+            current_vel (np.ndarray | list): The current velocity of the system as a 3D vector 
+                [vx, vy, vz].
+            **kwargs: Additional keyword arguments.
+
         Returns:
-            np.ndarray: _description_
+            np.ndarray: The beamformed synthetic response.
         """
+        
+        # Convert list to numpy array if necessary
+        if isinstance(current_vel, list):
+            current_vel = np.array(current_vel)
 
         #copy the adc cube to not modify the original
         adc_cube = adc_cube.copy()

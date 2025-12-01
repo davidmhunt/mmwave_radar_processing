@@ -152,11 +152,12 @@ class RangeProcessor(_Processor):
 
 
     def process(self, adc_cube: np.ndarray, chirp_idx: int = 0, **kwargs) -> np.ndarray:
-        """
-        Process the ADC cube to obtain a coarse range response
+        """Process the ADC cube to obtain a coarse range response.
 
         Args:
-            adc_cube (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps)
+            adc_cube (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps).
+            chirp_idx (int, optional): Index of the chirp to use. Defaults to 0.
+            **kwargs: Additional keyword arguments.
 
         Returns:
             np.ndarray: Magnitude of range FFT (range profile) for the selected RX channel.

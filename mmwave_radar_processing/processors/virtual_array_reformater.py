@@ -6,6 +6,12 @@ from mmwave_radar_processing.processors._processor import _Processor
 class VirtualArrayReformatter(_Processor):
 
     def __init__(self, config_manager: ConfigManager, **kwargs) -> None:
+        """Initialize the VirtualArrayReformatter.
+
+        Args:
+            config_manager (ConfigManager): The configuration manager.
+            **kwargs: Additional keyword arguments.
+        """
 
         #array to keep track of the chirp_cfg index for each chirp in the ADC config
         self.chirp_cfg_idxs:np.ndarray = None

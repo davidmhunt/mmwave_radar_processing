@@ -237,7 +237,6 @@ class mmWaveRadarProcessorController(QObject):
                 
                 # Load params for this processor
                 params = self.processor_params.get("processors", {}).get(key, {})
-                self.logger.debug("Processor %s params: %s", key, params)
                 try:
                     # Determine input data based on history requirement
                     if spec.num_frames_history > 1:

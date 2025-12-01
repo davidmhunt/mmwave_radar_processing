@@ -97,12 +97,14 @@ class Altimeter(RangeProcessor):
         else:
             return -1.0
 
-    def process(self, adc_cube: np.ndarray, precise_est_enabled:bool = True, **kwargs) -> np.ndarray:
-        """
-        Process the ADC cube to estimate the altitude (range to ground).
+    def process(self, adc_cube: np.ndarray, precise_est_enabled: bool = True, **kwargs) -> np.ndarray:
+        """Process the ADC cube to estimate the altitude (range to ground).
 
         Args:
-            adc_cube (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps)
+            adc_cube (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps).
+            precise_est_enabled (bool, optional): If True, use zoom FFT for precise estimation. 
+                Defaults to True.
+            **kwargs: Additional keyword arguments.
 
         Returns:
             np.ndarray: Processed response for altitude estimation.

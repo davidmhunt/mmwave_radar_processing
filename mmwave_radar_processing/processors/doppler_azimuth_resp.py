@@ -441,11 +441,20 @@ class DopplerAzimuthProcessor(_Processor):
         """
 
         #convert any lists to numpy arrays
-        if isinstance(rx_antennas, list):
+        #convert any lists to numpy arrays
+        if rx_antennas is None:
+            rx_antennas = np.array([])
+        elif isinstance(rx_antennas, list):
             rx_antennas = np.array(rx_antennas)
-        if isinstance(range_window, list):
+            
+        if range_window is None:
+            range_window = np.array([])
+        elif isinstance(range_window, list):
             range_window = np.array(range_window)
-        if isinstance(precise_vel_range, list):
+            
+        if precise_vel_range is None:
+            precise_vel_range = np.array([-0.25, 0.25])
+        elif isinstance(precise_vel_range, list):
             precise_vel_range = np.array(precise_vel_range) 
 
         #specify the antennas to use for computing the response

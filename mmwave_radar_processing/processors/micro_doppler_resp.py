@@ -8,9 +8,23 @@ class MicroDopplerProcessor(_Processor):
     def __init__(
             self,
             config_manager: ConfigManager,
-            target_ranges:np.ndarray = [0,1.0],
-            num_frames_history:int = 20,
+            target_ranges: np.ndarray | list = [0, 1.0],
+            num_frames_history: int = 20,
             **kwargs) -> None:
+        """Initialize the MicroDopplerProcessor.
+
+        Args:
+            config_manager (ConfigManager): The configuration manager.
+            target_ranges (np.ndarray | list, optional): Range window [min, max] to compute 
+                micro-Doppler response over. Defaults to [0, 1.0].
+            num_frames_history (int, optional): Number of frames to keep in history. 
+                Defaults to 20.
+            **kwargs: Additional keyword arguments.
+        """
+        
+        # Convert list to numpy array if necessary
+        if isinstance(target_ranges, list):
+            target_ranges = np.array(target_ranges)
 
         #velocity bins
         self.vel_bins:np.ndarray = None
