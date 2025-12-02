@@ -1,184 +1,232 @@
-# mmWave Radar GUI Plan
+# mmWave Radar GUI Documentation
 
-Plan for a PyQt6 + pyqtgraph GUI that fits the existing `mmwave_radar_processing` codebase and follows an MVC pattern driven by `CpslDS` (dataset) and `ConfigManager` (radar configuration).
+This document details the architecture, usage, and extension of the mmWave Radar GUI.
 
-## Scope and constraints
-- Use only dependencies already in `pyproject.toml` (PyQt6, pyqtgraph, numpy, imageio, etc.).
-- Support live streaming and offline playback; reuse the same controller logic for both.
-- Generate videos from any view using the existing `imageio[ffmpeg]` dependency.
-- Keep plotting logic in the new visualization layer; avoid mutating processor math.
-- Initial pass keeps processing sequential on the UI loop where possible; threading/performance tuning is planned, not implemented in v1.
-- Default dataset/config load behavior mirrors `scripts/view_radar_data.py` (e.g., dataset root `/data/RadVel`, config dir from `CONFIG_DIRECTORY`, and `6843_RadVel_ods_20Hz.cfg` with `array_geometry="ods"`, `array_direction="down"`), with CLI flags to override.
-- Dataset and processor parameters load from shared YAML files (`visualization/configs/dataset_params.yaml`, `visualization/configs/processor_params.yaml`); defaults match the current `view_radar_data.py` usage where applicable.
-- Logging: stdout-only via `mmwave_radar_processing/logging/logger.py`; GUI/scripts default to INFO level with CLI override. No in-GUI log panel for v1.
+## 1. GUI Architecture Overview
 
-## MVC architecture
-- **Model**
-  - `CpslDS` supplies frame-wise data (ADC cubes, point clouds, ancillary sensors) and handles dataset iteration, seek, and metadata.
-  - `ConfigManager` loads and exposes radar configuration (range/velocity/angle bins, antenna layout, performance metrics) for both processors and UI displays.
-  - Model facade in `visualization/models/` to wrap `CpslDS` + `ConfigManager` for thread-safe access.
-- **Controller**
-  - `mmWaveRadarProcessorController` in `visualization/backends/mmwave_radar_processor_controller.py`.
-  - Owns processor instances (one per response type) built from a registry, wires them to the models, manages playback timers, dispatches results to views, and handles commands from UI (play/pause, seek, export, config load). Processors are created and run only inside the controller; views never construct or run processors.
-  - Receives an injected logger (`get_logger(__name__)`) from the launcher; uses it for lifecycle/status/error logging.
-  - Provides a simple event bus (Qt signals) for view updates and status/errors.
-- **Views**
-  - All live in `mmwave_radar_processing/visualization/views/`.
-  - Each view is a pyqtgraph widget with a `set_data(payload)` or similar API and optional controls (colormap, dB toggle, axis limits).
-  - Views register themselves with the controller via the registry; controller drives updates.
-  - Main window + control panel in `visualization/gui/`.
+The GUI follows a **Model-View-Controller (MVC)** pattern to ensure separation of concerns between data handling, processing logic, and visualization.
 
-## Proposed directory layout
+- **Model**:
+    - **DatasetModel**: Wraps `CpslDS` to provide frame-wise data access (ADC cubes) and dataset metadata.
+    - **ConfigModel**: Wraps `ConfigManager` to load and expose radar configuration (range/velocity/angle bins, antenna layout).
+- **Controller**:
+    - **mmWaveRadarProcessorController**: The central hub that coordinates data flow. It owns the models and the processor instances. It runs the processing loop (driven by a `QTimer` for playback), feeds data to processors, and emits signals to update views.
+- **View**:
+    - **Views**: Located in `mmwave_radar_processing/visualization/views/`. These are `pyqtgraph` widgets that receive processed data and render it. They are passive and do not contain processing logic.
+    - **MainWindow**: The top-level window containing the control panel and the view grid.
+
+## 2. Processor Registry
+
+The processor registry (`mmwave_radar_processing/visualization/backends/processor_registry.py`) is the central configuration that maps unique keys to processor classes and their corresponding view classes.
+
+### Processor Status Table
+
+| Processor Key | Processor Class | View Class | Status | Comments |
+| :--- | :--- | :--- | :--- | :--- |
+| `range_doppler_resp` | `RangeDopplerProcessor` | `RangeDopplerView` | Active | |
+| `range_resp` | `RangeProcessor` | `RangeResponseView` | Active | |
+| `range_angle_resp` | `RangeAngleProcessor` | `RangeAngleView` | Active | |
+| `micro_doppler_resp` | `MicroDopplerProcessor` | `MicroDopplerView` | Active | Requires history buffer |
+| `doppler_azimuth_resp` | `DopplerAzimuthProcessor` | `DopplerAzimuthView` | Active | |
+| `altimeter` | `Altimeter` | `AltitudeView` | Planned | |
+| `velocity_estimator` | `VelocityEstimator` | `VelocityView` | Planned | |
+| `strip_map_SAR` | `StripMapSARProcessor` | `SarView` | Planned | |
+
+### Registry Description
+
+Each entry in the registry is a `ProcessorSpec` object containing:
+- `key`: Unique identifier string.
+- `display_name`: Human-readable name for the UI.
+- `processor_cls`: The Python class for the signal processor.
+- `view_cls`: The Python class for the GUI view widget.
+- `required_inputs`: Data required (e.g., "adc_cube").
+- `output_schema`: Description of output format.
+- `enabled`: Boolean flag to enable/disable in the GUI.
+- `num_frames_history`: Number of previous frames required (e.g., for Micro-Doppler).
+
+### Adding a New View/Processor
+
+1.  **Implement Processor**: Create your processor class in `mmwave_radar_processing/processors/`. It must implement a `process(adc_cube, **kwargs)` method.
+2.  **Implement View**: Create your view class in `mmwave_radar_processing/visualization/views/` inheriting from `BaseView`. Implement `update_view(payload)`.
+3.  **Register**: Add a new entry to the `registry` dictionary in `mmwave_radar_processing/visualization/backends/processor_registry.py` with your new classes and specifications.
+
+## 3. Backend Overview
+
+### `mmWaveRadarProcessorController`
+Located in `mmwave_radar_processing/visualization/backends/mmwave_radar_processor_controller.py`.
+
+#### 1. What it does
+Acts as the central coordinator. It manages the `DatasetModel` and `ConfigModel`, handles the playback timer, and delegates processor management and execution to the `ViewController`.
+
+#### 2. Key Functions
+-   `load_dataset(dataset_path, params)`: Initializes the `DatasetModel`.
+-   `load_config(config_path)`: Initializes the `ConfigModel` and triggers processor initialization via `ViewController`.
+-   `process_next_frame(frame_idx)`:
+    1.  Fetches ADC cube.
+    2.  Updates history buffer.
+    3.  Calls `view_controller.process_frame()`.
+-   `start()` / `stop()`: Controls the playback `QTimer`.
+
+### `ViewController`
+Located in `mmwave_radar_processing/visualization/backends/view_controller.py`.
+
+#### 1. What it does
+Manages the lifecycle and execution of signal processors. It decouples the processing logic from the main controller.
+
+#### 2. Key Functions
+-   `initialize_processors(config_manager, processor_params)`: Instantiates processors based on the registry and configuration.
+-   `process_frame(adc_cube, history_buffer, processor_params)`:
+    1.  Iterates through enabled processors.
+    2.  Checks history requirements.
+    3.  Calls `processor.process()`.
+    4.  Dynamically constructs the payload using `ProcessorSpec.view_keys`.
+    5.  Emits `view_update` signal.
+
+#### 3. Dynamic Payload Generation
+The `ViewController` uses the `view_keys` list in `ProcessorSpec` to automatically extract attributes from the processor instance and include them in the payload sent to the view. This allows views to request specific metadata (e.g., `range_bins`, `vel_bins`) without hardcoding them in the controller.
+
+## 4. GUI Windows
+
+### `MainWindow`
+Located in `mmwave_radar_processing/visualization/gui/main_window.py`.
+
+-   **Responsibility**: Top-level application window. Manages the layout of the Control Panel (left) and View Grid (right).
+-   **Key Functions**:
+    -   `_init_ui()`: Sets up the grid layout and connects signals.
+    -   `_handle_view_update(key, payload)`: Routes data from the controller to the correct `BaseView` widget.
+    -   `_handle_view_toggle(states)`: Shows/hides views based on checkboxes.
+
+### `ControlPanel`
+Located in `mmwave_radar_processing/visualization/gui/control_panel.py`.
+
+-   **Responsibility**: User interface for configuration.
+-   **Key Functions**:
+    -   `_browse_dataset()`, `_browse_config()`: File dialogs for selection.
+    -   `_emit_view_toggle()`: Notifies main window when view checkboxes change.
+    -   `_emit_db_mode()`: Toggles dB vs Linear scale rendering.
+
+## 5. Processed Views
+
+All views inherit from `BaseView` in `mmwave_radar_processing/visualization/views/base_view.py`.
+
+### `BaseView`
+-   **Responsibility**: Abstract base class providing common interface.
+-   **Key Functions**:
+    -   `set_data(payload)`: Public API called by MainWindow. Stores payload and calls `update_view`.
+    -   `update_view(payload)`: Abstract method. Must be implemented by subclasses to render data.
+    -   `set_db_mode(enabled)`: Toggles log-scale rendering and triggers a re-draw.
+
+### Implemented Views
+1.  **RangeDopplerView**: Displays Range-Doppler heatmap. Expects `data` (2D array), `range_bins`, `vel_bins`.
+2.  **RangeResponseView**: Displays 1D Range profile. Expects `data` (1D array), `range_bins`.
+3.  **RangeAngleView**: Displays Range-Angle heatmap. Expects `data` (2D array), `range_bins`, `angle_bins`.
+4.  **MicroDopplerView**: Displays Time-Velocity spectrogram. Expects `data` (2D array), `time_bins`, `vel_bins`.
+5.  **DopplerAzimuthView**: Displays Velocity-Angle heatmap. Expects `data` (2D array), `vel_bins`, `angle_bins`.
+
+### Creating a New View
+1.  Create a file `my_new_view.py` in `views/`.
+2.  Class `MyNewView(BaseView)`.
+3.  In `__init__`, setup your `pyqtgraph` items (PlotWidget, ImageItem, etc.).
+4.  Implement `update_view(self, payload)`:
+    -   Extract data: `data = payload['data']`.
+    -   Handle dB conversion if `self.convert_to_db` is True.
+    -   Update your graph widget (e.g., `self.image.setImage(data)`).
+
+## 6. Configuration Files
+
+Configuration files are located in `gui_configs/`.
+
+### `dataset_params.yaml`
+Contains default paths and settings for loading datasets.
+-   **Usage**: Loaded by `launch_mmwave_viewer.py` to set initial defaults.
+-   **Structure**:
+    -   `dataset`: Paths to `dataset_path`, `radar_adc_folder`, etc.
+    -   `config`: Default radar config file `name`, `array_geometry`, `array_direction`.
+
+**Example `dataset_params.yaml`:**
+```yaml
+dataset:
+  # Path to the root directory of the dataset
+  dataset_path: dev_resources/CPSL_RadVel_ods_10Hz_1_sample
+  # Subfolder containing ADC data
+  radar_adc_folder: radar_0_adc
+  # Other sensor folders (optional)
+  camera_folder: camera
+  lidar_folder: lidar
+
+config:
+  # Default radar configuration file to load
+  name: 6843_RadVel_ods_20Hz.cfg
+  # Antenna array geometry (e.g., 'ods', 'planar')
+  array_geometry: ods
+  # Array mounting direction
+  array_direction: down
 ```
-mmwave_radar_processing/
-  visualization/
-    backends/
-      mmwave_radar_processor_controller.py
-      processor_registry.py          # maps response keys -> processors/views
-      data_sources.py                # dataset vs live stream adapters
-    gui/
-      main_window.py                 # assembles layout, menus, status bar
-      control_panel.py               # dataset selection, playback controls, toggles
-    models/
-      dataset_model.py               # thin wrapper over CpslDS
-      config_model.py                # thin wrapper over ConfigManager
-    views/
-      base_view.py
-      range_doppler_view.py
-      range_response_view.py
-      range_angle_view.py
-      micro_doppler_view.py
-      doppler_azimuth_view.py
-      (planned) altitude_view.py
-      (planned) velocity_view.py
-      (planned) sar_view.py
-    utils/
-      video_export.py                # grabs frames from a view and writes video
-      threading.py                   # worker helpers (planned for later)
-    configs/
-        dataset_params.yaml         # dataset + config defaults
-        processor_params.yaml       # processor parameters (shared across processors)
-scripts/
-  launch_mmwave_viewer.py            # CLI entry point (dataset-root, config-name, log-level, processor-params)
+
+### `processor_params.yaml`
+Contains runtime parameters for each processor.
+-   **Usage**: Loaded by the Controller. Parameters are passed as `kwargs` to the `process()` method of the corresponding processor.
+-   **Structure**: Keyed by processor registry key (e.g., `range_doppler_resp`).
+
+**Example `processor_params.yaml`:**
+```yaml
+processors:
+  range_angle_resp:
+    num_angle_bins: 64
+    rx_antennas: [0,3,4,7]
+    chirp_idx: 0
+    
+  range_doppler_resp:
+    rx_idx: 0
+    
+  micro_doppler_resp:
+    target_ranges: [3.0, 3.7]
+    num_frames_history: 20
+    rx_idx: 0
+    
+  doppler_azimuth_resp:
+    num_angle_bins: 64
+    valid_angle_range: [-1.047, 1.047]
+    min_zoom_fft_vel_span: 0.1
+    rx_antennas: [4,5,8,9]
+    range_window: [0.9, 2.0]
+    shift_angle: false
+    use_precise_fft: false
+    precise_vel_range: [-0.25, 0.25]
+    
+  range_resp:
+    chirp_idx: 0
 ```
 
-## Processor registry (controller-owned)
-Central mapping in `processor_registry.py` that the controller uses to instantiate processors and views once, then reuse:
-- Implemented in first pass:
-  - `range_doppler_resp`: `RangeDopplerProcessor` + `RangeDopplerView`
-  - `range_resp`: `RangeProcessor` + `RangeResponseView`
-  - `range_angle_resp`: `RangeAngleProcessor` + `RangeAngleView`
-  - `micro_doppler_resp`: `MicroDopplerProcessor` + `MicroDopplerView`
-  - `doppler_azimuth_resp`: `DopplerAzimuthProcessor` + `DopplerAzimuthView`
-- Planned (registry entries stubbed, views/classes marked TODO):
-  - `altimeter`: `Altimeter` + `AltitudeView`
-  - `velocity_estimator`: `VelocityEstimator` + `VelocityView`
-  - `strip_map_SAR`: `StripMapSARProcessor` + `SarView`
-  - `synthetic_array_beamformer`: `SyntheticArrayBeamformerProcessor` + view TBD
-  - `virtual_array_reformatter`/`beamformer` variants: view TBD
+## 7. Launch Scripts
 
-Each entry includes:
-- `key`, `display_name`
-- `processor_cls`
-- `view_cls`
-- `required_inputs` (e.g., ADC cube vs point cloud)
-- `output_schema` (numpy array shape, axis labels)
-- `enabled` flag (false for planned items)
-- Initialization + execution location: controller instantiates all enabled processors once during startup (or when registry changes) and runs them per-frame; views only render data handed off by the controller.
-- `base_view.py` is the abstract parent defining the shared widget scaffolding and `set_data`/lifecycle API that all concrete views subclass.
-- Parameter injection: controller applies per-processor parameters from the YAML file at construction time (with validation and fallbacks to code defaults).
-- Logging hooks: controller/views/processors accept an optional logger parameter (defaulting to `get_logger(__name__)`); no module-level logger globals in classes.
-- Dataset params: controller/models load dataset and default config from `dataset_params.yaml` (CpslDS init kwargs plus config name/array geometry/direction).
+### `launch_mmwave_viewer.py`
+Located in `scripts/launch_mmwave_viewer.py`.
 
-## Data flow
-1) Source selection: dataset (`CpslDS`) or live stream adapter (same interface: `next_frame()`, `seek(frame_idx)`, `frame_rate` hint).  
-2) Controller pulls raw frame, passes config + frame to the needed processors (based on which views are visible/subscribed). Processors always run inside the controller pipeline, not in views.  
-3) Processors return numpy arrays; controller emits per-view signals with dict payloads that include both data and axes bins/metadata expected by each view.  
-4) Views render via pyqtgraph; control panel tweaks view params (dB toggle, cmap, thresholds).  
-5) Video export requests hook into the controller to capture rendered frames from a view and stream them to `imageio` writers.  
-6) Errors/slowdowns surfaced through status bar/log pane.
+-   **Usage**: Entry point for the application.
+-   **Command**:
+    ```bash
+    poetry run python scripts/launch_mmwave_viewer.py [arguments]
+    ```
+-   **Arguments**:
+    -   `--dataset-path`: Override default dataset path.
+    -   `--config-name`: Override default config file.
+    -   `--dataset-params`: Path to custom dataset params YAML.
+    -   `--processor-params`: Path to custom processor params YAML.
+    -   `--log-level`: Set logging verbosity (INFO, DEBUG).
 
-## Main window and control panel
-- Main window layout:
-  - Left control panel: dataset selection and radar config selection (load/change), processor-params YAML picker (load/reload), plus toggles to enable which responses to show.
-  - Right view area: stacked/tabbed views for selected responses.
-  - Bottom status bar and frame slider: play/pause/step/loop controls, FPS indicator, frame index, warnings.
-- Control panel actions talk to the controller; views remain passive renderers.
-
-## Live streaming and playback
-- Playback: QTimer-driven stepping over `CpslDS` frames; supports looping, jump-to-frame, and downsampling (skip stride).
-- Live: minimal initial support uses the same controller loop; background workers/buffers are planned, not in v1.
-- Shared interface allows switching source at runtime without recreating views.
-
-## Video generation
-- Per-view capture pipeline: controller asks a view to render to QImage/np array each frame; `video_export.py` writes via `imageio.get_writer`.
-- Supports fixed-length exports from dataset playback and timed exports during live sessions.
-- Minimal UI: choose view, path, fps, duration/frame range.
-
-## Configuration + dataset handling
-- Config load via `ConfigManager` (file picker or CLI arg); controller distributes config to processors and surfaces computed performance metrics in UI.
-- Dataset chooser built atop `CpslDS.print_available_folders` + path selection; controller reinitializes dataset model and resets playback state.
-- Model layer ensures thread-safe reads and exposes frame count, timestamps, and sensor availability so the UI can gray out unsupported views.
-- Processor parameter YAML: single shared file keyed by processor registry keys. Example:
-  ```yaml
-  processors:
-    range_angle_resp:
-      num_angle_bins: 64
-      rx_antennas: []          # process() kwarg
-      chirp_idx: 0             # process() kwarg
-    range_doppler_resp:
-      rx_idx: 0                # process() kwarg
-    micro_doppler_resp:
-      target_ranges: [3.0, 3.7]
-      num_frames_history: 20   # __init__
-      rx_idx: 0                # process() kwarg
-    doppler_azimuth_resp:
-      num_angle_bins: 64       # __init__
-      valid_angle_range: [-1.04719755, 1.04719755]  # __init__
-      min_zoom_fft_vel_span: 0.1                    # __init__
-      rx_antennas: []          # process() kwarg
-      range_window: []         # process() kwarg
-      shift_angle: true        # process() kwarg
-      use_precise_fft: false   # process() kwarg
-      precise_vel_range: [-0.25, 0.25]              # process() kwarg
-    range_resp:
-      chirp_idx: 0             # process() kwarg
-  ```
-  Controller loads this once, validates keys against the registry, and applies only parameters that exist in each processor's `__init__` or `process()` signature; logs warnings for unknown keys. Missing parameters fall back to processor defaults. Control panel allows swapping/reloading the YAML at runtime.
-- Dataset parameter YAML: includes CpslDS kwargs and config metadata:
-  ```yaml
-  dataset:
-    dataset_path: /data/RadVel/CPSL_RadVel_ods_20Hz_1
-    radar_adc_folder: radar_0_adc
-    camera_folder: camera
-    ...
-  config:
-    name: 6843_RadVel_ods_20Hz.cfg
-    array_geometry: ods
-    array_direction: down
-  ```
-  Launcher loads this to set defaults for dataset and config if CLI flags are not provided.
-- Launcher (`scripts/launch_mmwave_viewer.py`) CLI params: `--dataset-params` (path to YAML, default `visualization/configs/dataset_params.yaml`), `--dataset-path` (overrides dataset path from YAML), `--config-name` (overrides config name from YAML), `--log-level` (e.g., INFO/DEBUG), `--processor-params` (path to YAML in `configs/`, default `processor_params.yaml`); defaults pulled from the YAML. Launcher calls `setup_logger(level=parsed_level)` once, then passes loggers into controller/views/processors.
-
-## Threading and performance (planned)
-- Future: offload heavy processors to worker threads/pools and batch emits to avoid signal storms.
-- Future: optional decimation for heavy processors, configurable in the control panel.
-- v1: sequential processing on the controller loop with a QTimer driving playback; target correctness first.
-
-## View layout selection
-- Initial approach: right view area uses a fixed 2x3 grid (QGridLayout) to match the five initial responses; each slot has a dropdown to choose which response to render (or hide). This keeps simultaneous comparison easy and avoids complex docking.  
-- Responsive grid: dynamically resizes to show only active views, up to three columns per row; adds rows as needed. Future option: dockable/tabbed panels if more flexibility is needed.
+---
 
 ## Implementation phases
-1) ~~Scaffolding: directory creation, entry script, base controller, base view, registry with implemented items.~~  
-2) ~~Models: dataset/config wrappers, source adapters, basic error handling.~~  
-3) ~~Views (initial five responses) with pyqtgraph widgets and simple controls.~~  
-4) ~~Controller wiring: playback/live loops, processor dispatch, signal plumbing, status updates.~~  
-5) ~~Planned processors/views: add stubs to registry and placeholder views; implement incrementally.~~  
-6) ~~Logging integration: ensure GUI components use injected loggers; replace any `print` in GUI modules with logger calls.~~  
-7) Video export utility and UI hook.
-8) Threading/performance enhancements (planned after initial pass).  
-9) Polish: presets for colormaps/thresholds, layout persistence, logging pane (future if desired), dB/magnitude toggle wiring.
+1. ~~Scaffolding: directory creation, entry script, base controller, base view, registry with implemented items.~~
+2. ~~Models: dataset/config wrappers, source adapters, basic error handling.~~
+3. ~~Views (initial five responses) with pyqtgraph widgets and simple controls.~~
+4. ~~Controller wiring: playback/live loops, processor dispatch, signal plumbing, status updates.~~
+5. ~~Planned processors/views: add stubs to registry and placeholder views; implement incrementally.~~
+6. ~~Logging integration: ensure GUI components use injected loggers; replace any `print` in GUI modules with logger calls.~~
+7. Video export utility and UI hook.
+8. Threading/performance enhancements (planned after initial pass).
+9. Polish: presets for colormaps/thresholds, layout persistence, logging pane (future if desired), dB/magnitude toggle wiring.
 
 
 ## Current Bugs/requested changes

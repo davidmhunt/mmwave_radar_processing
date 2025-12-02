@@ -16,6 +16,8 @@ from mmwave_radar_processing.visualization.models.config_model import ConfigMode
 from mmwave_radar_processing.visualization.models.dataset_model import DatasetModel
 
 
+from mmwave_radar_processing.visualization.backends.view_controller import ViewController
+
 class mmWaveRadarProcessorController(QObject):
     """Controller connecting models, processors, and views."""
 
@@ -55,9 +57,12 @@ class mmWaveRadarProcessorController(QObject):
         self.config_model: Optional[ConfigModel] = None
         self.processor_params: Dict[str, Any] = {}
         self.virtual_array_reformatter: Optional[Any] = None
-        self.processors: Dict[str, Any] = {}
         self.adc_buffer: Optional[Any] = None
         self.last_processed_frame: int = -1
+        
+        # Instantiate View Controller
+        self.view_controller = ViewController(self.registry, parent=self, logger=self.logger)
+        self.view_controller.view_update.connect(self.view_update.emit)
         
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._on_timer_timeout)
@@ -182,9 +187,9 @@ class mmWaveRadarProcessorController(QObject):
             self.last_processed_frame = -1
             if self.adc_buffer:
                 self.adc_buffer.clear()
-            for processor in self.processors.values():
-                if hasattr(processor, "reset"):
-                    processor.reset()
+            # Reset processors if they have state (handled by view controller re-init or reset method if added)
+            # For now, we just rely on buffer clear
+            
             # Emit frame 0 to reset slider and view
             self.process_next_frame(0)
             return
@@ -207,10 +212,6 @@ class mmWaveRadarProcessorController(QObject):
                 self.logger.debug("Seek detected: %d -> %d. Resetting buffer.", self.last_processed_frame, frame_idx)
                 if self.adc_buffer:
                     self.adc_buffer.clear()
-                # Reset processors if they have state
-                for processor in self.processors.values():
-                    if hasattr(processor, "reset"):
-                        processor.reset()
             
             self.last_processed_frame = frame_idx
 
@@ -228,61 +229,12 @@ class mmWaveRadarProcessorController(QObject):
             if self.adc_buffer is not None:
                 self.adc_buffer.append(adc_cube)
 
-            # 4. Run active processors
-            for key, spec in self.registry.items():
-                if not spec.enabled or key not in self.processors:
-                    continue
-
-                processor = self.processors[key]
-                
-                # Load params for this processor
-                params = self.processor_params.get("processors", {}).get(key, {})
-                try:
-                    # Determine input data based on history requirement
-                    if spec.num_frames_history > 1:
-                        if len(self.adc_buffer) < spec.num_frames_history:
-                            # Not enough history yet
-                            continue
-                        result = processor.process(adc_cube=adc_cube, **params)
-                    else:
-                        result = processor.process(adc_cube=adc_cube, **params)
-
-                    # 5. Emit update
-                    # Construct payload matching view's set_data expectation
-                    payload = {"data": result}
-                    
-                    # Add metadata if available
-                    if hasattr(processor, "range_bins") and processor.range_bins is not None:
-                        payload["range_bins"] = processor.range_bins
-                    
-                    if hasattr(processor, "vel_bins") and processor.vel_bins is not None:
-                        # Special handling for DopplerAzimuthProcessor which might use zoomed bins
-                        if key == "doppler_azimuth_resp" and hasattr(processor, "zoomed_vel_bins") \
-                           and processor.zoomed_vel_bins is not None and processor.zoomed_vel_bins.size > 0:
-                             # Check if precise FFT was used. 
-                             # We can check if the output shape matches zoomed_vel_bins
-                             # result shape is [vel, angle]
-                             if result.shape[0] == processor.zoomed_vel_bins.size:
-                                 payload["vel_bins"] = processor.zoomed_vel_bins
-                             else:
-                                 payload["vel_bins"] = processor.vel_bins
-                        else:
-                            payload["vel_bins"] = processor.vel_bins
-
-                    if hasattr(processor, "angle_bins") and processor.angle_bins is not None:
-                        # Special handling for DopplerAzimuthProcessor which filters angles
-                        if key == "doppler_azimuth_resp" and hasattr(processor, "valid_angle_bins"):
-                             payload["angle_bins"] = processor.valid_angle_bins
-                        else:
-                            payload["angle_bins"] = processor.angle_bins
-                            
-                    if hasattr(processor, "time_bins") and processor.time_bins is not None:
-                        payload["time_bins"] = processor.time_bins
-                    
-                    self.view_update.emit(key, payload)
-
-                except Exception as exc:
-                    self.logger.error("Error processing %s: %s", key, exc)
+            # 4. Delegate to View Controller
+            self.view_controller.process_frame(
+                adc_cube=adc_cube,
+                history_buffer=self.adc_buffer,
+                processor_params=self.processor_params
+            )
             
             self.frame_processed.emit(frame_idx)
 
@@ -303,32 +255,18 @@ class mmWaveRadarProcessorController(QObject):
         self.virtual_array_reformatter = VirtualArrayReformatter(
             self.config_model.config_manager
         )
-        self.virtual_array_reformatter.configure()
 
-        self.processors = {}
+        # Delegate processor init to View Controller
+        self.view_controller.initialize_processors(
+            self.config_model.config_manager,
+            self.processor_params
+        )
+
+        # Determine max history from registry
         max_history = 1
-
-        for key, spec in self.registry.items():
-            if not spec.enabled:
-                continue
-            
-            try:
-                # Instantiate processor
-                # We assume all processors take config_manager as first arg
-                # and accept kwargs from processor_params
-                
-                params = self.processor_params.get("processors", {}).get(key, {})
-                
-                processor = spec.processor_cls(
-                    self.config_model.config_manager, **params
-                )
-                self.processors[key] = processor
-                
-                if spec.num_frames_history > max_history:
-                    max_history = spec.num_frames_history
-                    
-            except Exception as exc:
-                self.logger.error("Failed to init processor %s: %s", key, exc)
+        for spec in self.registry.values():
+            if spec.enabled and spec.num_frames_history > max_history:
+                max_history = spec.num_frames_history
 
         self.max_history = max_history
         self.adc_buffer = deque(maxlen=max_history)
