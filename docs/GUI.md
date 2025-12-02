@@ -87,14 +87,23 @@ The `ViewController` uses the `view_keys` list in `ProcessorSpec` to automatical
 
 ## 4. GUI Windows
 
+## 4. GUI Windows
+
 ### `MainWindow`
 Located in `mmwave_radar_processing/visualization/gui/main_window.py`.
 
--   **Responsibility**: Top-level application window. Manages the layout of the Control Panel (left) and View Grid (right).
+-   **Responsibility**: Top-level application window. Manages the layout of the Control Panel (left) and the Processor View Panel (right).
 -   **Key Functions**:
-    -   `_init_ui()`: Sets up the grid layout and connects signals.
-    -   `_handle_view_update(key, payload)`: Routes data from the controller to the correct `BaseView` widget.
-    -   `_handle_view_toggle(states)`: Shows/hides views based on checkboxes.
+    -   `_init_ui()`: Sets up the layout and connects signals between the controller, control panel, and view panel.
+
+### `ProcessorViewPanel`
+Located in `mmwave_radar_processing/visualization/gui/processor_view_panel.py`.
+
+-   **Responsibility**: Manages the grid of views.
+-   **Layout**: A 2x2 grid where each cell contains a dropdown menu to select the active view for that cell.
+-   **Key Functions**:
+    -   `_on_dropdown_changed(row, col, text)`: Handles switching views in a grid cell.
+    -   `handle_view_update(key, payload)`: Updates the view widget if it is currently active in any of the grid cells.
 
 ### `ControlPanel`
 Located in `mmwave_radar_processing/visualization/gui/control_panel.py`.
