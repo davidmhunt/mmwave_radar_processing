@@ -28,7 +28,6 @@ class ControlPanel(QWidget):
     dataset_selected = pyqtSignal(str)
     config_selected = pyqtSignal(str)
     params_selected = pyqtSignal(str)
-    views_toggled = pyqtSignal(dict)
     db_mode_changed = pyqtSignal(bool)
 
     def __init__(
@@ -47,9 +46,7 @@ class ControlPanel(QWidget):
         super().__init__(parent)
         self.logger = logger or get_logger(__name__)
         self.available_views = available_views
-        self.view_checkboxes: Dict[str, QCheckBox] = {}
         self._build_ui()
-        self._emit_view_toggle()
 
     def _build_ui(self) -> None:
         """Build the UI layout."""
@@ -91,17 +88,6 @@ class ControlPanel(QWidget):
         render_group.setLayout(render_layout)
         main_layout.addWidget(render_group)
 
-        views_group = QGroupBox("Views")
-        views_layout = QVBoxLayout()
-        for view_key in self.available_views:
-            checkbox = QCheckBox(view_key)
-            checkbox.setChecked(True)
-            checkbox.stateChanged.connect(self._emit_view_toggle)
-            self.view_checkboxes[view_key] = checkbox
-            views_layout.addWidget(checkbox)
-        views_group.setLayout(views_layout)
-        main_layout.addWidget(views_group)
-
         main_layout.addStretch()
 
     def _row_with_button(self, line_edit: QLineEdit, button: QPushButton) -> QWidget:
@@ -134,10 +120,6 @@ class ControlPanel(QWidget):
             self.params_edit.setText(path)
             self.params_selected.emit(path)
 
-    def _emit_view_toggle(self) -> None:
-        """Emit the current view toggle state."""
-        states = {key: cb.isChecked() for key, cb in self.view_checkboxes.items()}
-        self.views_toggled.emit(states)
 
     def _emit_db_mode(self) -> None:
         """Emit the dB mode state."""

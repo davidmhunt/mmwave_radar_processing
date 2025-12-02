@@ -67,7 +67,6 @@ class MainWindow(QMainWindow):
             parent=self,
             logger=self.logger,
         )
-        control_panel.views_toggled.connect(self._handle_view_toggle)
         control_panel.dataset_selected.connect(self.controller.load_dataset)
         control_panel.config_selected.connect(self.controller.load_config)
         control_panel.params_selected.connect(lambda path: self.logger.info("Params file selected: %s", path))
@@ -134,15 +133,6 @@ class MainWindow(QMainWindow):
                     
         except Exception as exc:
             self.logger.warning("Could not connect signals: %s", exc)
-
-    def _handle_view_toggle(self, states: Dict[str, bool]) -> None:
-        """Show or hide views based on toggle states.
-        
-        Note: With the new dropdown system, this might be redundant for visibility,
-        but we can keep it if we want to disable processing for unchecked views later.
-        For now, we just log it.
-        """
-        self.logger.debug("View toggles changed: %s", states)
 
     def _update_frame_label(self, value: int) -> None:
         """Update the current frame label."""

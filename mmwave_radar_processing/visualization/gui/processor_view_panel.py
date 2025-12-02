@@ -146,6 +146,28 @@ class ProcessorViewPanel(QWidget):
         if layout is None:
             return
 
+        # Check if the new view is already active in another cell
+        if new_key is not None:
+            for (r, c), active_key in self.active_views.items():
+                if active_key == new_key and (r, c) != (row, col):
+                    self.logger.info("View %s moved from (%d, %d) to (%d, %d)", new_key, r, c, row, col)
+                    # Find the combo for the old cell and set it to None (index 0)
+                    # We need to find the combo widget in the grid layout
+                    # grid -> cell_widget -> cell_layout -> combo (item 0)
+                    grid = self.layout()
+                    if grid:
+                        item = grid.itemAtPosition(r, c)
+                        if item and item.widget():
+                            cell_widget = item.widget()
+                            old_combo = cell_widget.findChild(QComboBox)
+                            if old_combo:
+                                # Block signals to prevent recursion if needed, 
+                                # but we actually WANT the signal to fire to update the old cell UI
+                                # However, setting it to 0 will trigger _on_dropdown_changed for (r,c)
+                                # which will hide the view there. This is exactly what we want.
+                                old_combo.setCurrentIndex(0) 
+                    break
+
         # Hide old view
         if old_key and old_key in self.view_widgets:
             old_widget = self.view_widgets[old_key]
