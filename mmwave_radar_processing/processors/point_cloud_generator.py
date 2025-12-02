@@ -2,12 +2,10 @@
 import numpy as np
 from typing import Dict, List, Union, Optional
 
-from mmwave_radar_processing.processors._processor import _Processor
-from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
-from mmwave_radar_processing.detectors.detector_registry import get_detector_registry
+from mmwave_radar_processing.processors.range_doppler_detector import RangeDopplerDetector
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.logging.logger import get_logger
-class PointCloudGenerator(_Processor):
+class PointCloudGenerator(RangeDopplerDetector):
     """
     Generates a 3D point cloud from raw ADC data using a standard radar signal processing pipeline.
     
@@ -21,13 +19,13 @@ class PointCloudGenerator(_Processor):
     def __init__(
         self,
         config_manager: ConfigManager,
-        cfar_type: str = "ca_cfar_2d",
-        cfar_params: Dict = {},
-        num_angle_bins: int = 64,
-        az_antenna_idxs: Union[List[int], np.ndarray] = None,
-        el_antenna_idxs: Union[List[int], np.ndarray] = None,
+        az_antenna_idxs: Union[List[int], np.ndarray],
+        el_antenna_idxs: Union[List[int], np.ndarray],
         shift_az_resp: bool = True,
         shift_el_resp: bool = False,
+        num_angle_bins: int = 64,
+        cfar_type: str = "ca_cfar_2d",
+        cfar_params: Dict = {},
         **kwargs
     ):
         """
@@ -67,31 +65,28 @@ class PointCloudGenerator(_Processor):
         else:
             raise ValueError("el_antenna_idxs must be a list or numpy array")
 
-        # Initialize RangeDopplerProcessor
-        self.range_doppler_processor = RangeDopplerProcessor(config_manager)
-        self.range_bins = self.range_doppler_processor.range_bins
-        self.vel_bins = self.range_doppler_processor.vel_bins
-            
-        detector_registry = get_detector_registry()
-        if cfar_type not in detector_registry:
-            raise ValueError(f"Unknown CFAR type: {cfar_type}. Available: {list(detector_registry.keys())}")
-            
-        detector_cls = detector_registry[cfar_type]
-        self.detector = detector_cls(**cfar_params)
-
         #setting up angular processing
         self.num_angle_bins = num_angle_bins
         self.phase_shifts:np.ndarray = None
         self.angle_bins:np.ndarray = None
         
-        super().__init__(config_manager)
+        super().__init__(
+            config_manager,
+            cfar_type=cfar_type,
+            cfar_params=cfar_params,
+            **kwargs
+        )
         
-        self.logger.info(f"PointCloudGenerator initialized with {cfar_type} and params {cfar_params}")
+        self.logger.info(f"PointCloudGenerator initialized")
 
     def configure(self):
         """
         Configure the processor.
         """
+
+        #initialize the parent classes
+        super().configure()
+
         self.phase_shifts = np.arange(
             start=np.pi,
             stop= -np.pi - 2 * np.pi/(self.num_angle_bins - 1),
@@ -104,6 +99,7 @@ class PointCloudGenerator(_Processor):
         #compute the angle bins
         self.angle_bins = np.arcsin(self.phase_shifts / np.pi)
 
+    
     def process(self, adc_cube: np.ndarray, **kwargs) -> np.ndarray:
         """
         Process the ADC cube to generate a point cloud.
@@ -115,13 +111,14 @@ class PointCloudGenerator(_Processor):
         Returns:
             np.ndarray: Generated point cloud in cartesian coordinates (x,y,z,vel).
         """
-        # 1. Range-Doppler Processing
-        rng_dop_resp_raw, rng_dop_resp = self._compute_range_doppler_response(adc_cube)
 
-        # 2. CFAR Detection
-        dets = self._perform_cfar_detection(rng_dop_resp)
+        #1. Compute Range-Doppler Response and Detections
+        dets = super().process(
+            adc_cube=adc_cube,
+            **kwargs    
+        )
 
-        if not dets:
+        if dets.shape[0] == 0:
             return np.empty((0, 4))
 
         # 3. Map detections to range/velocity bins
@@ -129,7 +126,7 @@ class PointCloudGenerator(_Processor):
 
         # 4. Angle Estimation (Vectorized)
         az_angles, el_angles = self._compute_angle_estimation(
-            rng_dop_resp_raw, det_range_idxs, det_velocity_idxs
+            self.rng_dop_resp_raw, det_range_idxs, det_velocity_idxs
         )
 
         # 5. Coordinate Transformation (Spherical -> Cartesian)
@@ -139,63 +136,6 @@ class PointCloudGenerator(_Processor):
 
         return dets_cartesian
 
-    def _compute_range_doppler_response(self, adc_cube: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Compute the Range-Doppler response.
-
-        Args:
-            adc_cube (np.ndarray): Input ADC cube.
-
-        Returns:
-            tuple[np.ndarray, np.ndarray]: (Raw complex response, Magnitude response)
-        """
-        # Assume virtual array processing is already done
-        # Use rx_idx=-1 to get response for all antennas
-        rng_dop_resp_raw = self.range_doppler_processor.process(
-            adc_cube=adc_cube,
-            rx_idx=-1,
-            return_magnitude=False
-        )
-        
-        # Use the first antenna (or average/sum) for detection map
-        # Typically, detection is done on non-coherent integration or a specific antenna
-        # Here we use the magnitude of the first antenna's response as a simple baseline
-        # Or we could sum magnitudes across antennas for better SNR
-        rng_dop_resp = np.abs(rng_dop_resp_raw[0, :, :])
-        
-        return rng_dop_resp_raw, rng_dop_resp
-
-    def _perform_cfar_detection(self, rng_dop_resp: np.ndarray) -> List:
-        """
-        Perform CFAR detection on the Range-Doppler map.
-
-        Args:
-            rng_dop_resp (np.ndarray): Range-Doppler magnitude map.
-
-        Returns:
-            List: List of detections (tuples of indices).
-        """
-        dets = self.detector.detect(rng_dop_resp)
-        return dets
-
-    def _map_detections_to_bins(self, dets: List) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Map detection indices to physical range and velocity values.
-
-        Args:
-            dets (List): List of detection indices.
-
-        Returns:
-            tuple: (det_ranges, det_velocities, det_range_idxs, det_velocity_idxs)
-        """
-        dets_array = np.array(dets)
-        det_range_idxs = dets_array[:, 0].astype(int)
-        det_velocity_idxs = dets_array[:, 1].astype(int)
-
-        det_ranges = self.range_bins[det_range_idxs]
-        det_velocities = self.vel_bins[det_velocity_idxs]
-
-        return det_ranges, det_velocities, det_range_idxs, det_velocity_idxs
 
     def _compute_angle_estimation(
         self, 
@@ -292,4 +232,4 @@ class PointCloudGenerator(_Processor):
         """
         Reset the processor state.
         """
-        pass
+        super().reset()

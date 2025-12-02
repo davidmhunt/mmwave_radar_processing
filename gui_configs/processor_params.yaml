@@ -20,3 +20,21 @@ processors:
     precise_vel_range: [-0.25, 0.25]
   range_resp:
     chirp_idx: 0
+  range_doppler_detector:
+    cfar_type: "os_cfar_2d"
+    cfar_params:
+      num_train: [7,7]
+      num_guard: [4,4]
+      rho: 0.7
+      alpha: 5
+  point_cloud_generator:
+    cfar_type: "os_cfar_2d"
+    cfar_params:
+      num_train: [7,7]
+      num_guard: [4,4]
+      rho: 0.7
+      alpha: 5
+    az_antenna_idxs: [0,3,4,7]
+    el_antenna_idxs: [9,8,5,4]
+    shift_az_resp: true
+    shift_el_resp: false

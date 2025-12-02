@@ -149,3 +149,42 @@ def test_point_cloud_generator_real_data(config_manager,adc_cube):
         pytest.fail(f"Processing failed: {e}")
 
     print("PointCloudGenerator Real Data Test Passed.")
+
+def test_range_doppler_detector(config_manager, adc_cube):
+    """Test the RangeDopplerDetector processor."""
+    print("Testing RangeDopplerDetector...")
+    from mmwave_radar_processing.processors.range_doppler_detector import RangeDopplerDetector
+    
+    # Initialize processor
+    processor = RangeDopplerDetector(
+        config_manager=config_manager,
+        cfar_type="ca_cfar_2d",
+        cfar_params={"num_train": (4, 4), "num_guard": (2, 2), "pfa": 1e-5}
+    )
+    
+    # Process
+    detections = processor.process(adc_cube)
+    
+    # Verify outputs
+    assert isinstance(detections, np.ndarray)
+    # Shape should be (N, 2) where N is number of detections
+    assert detections.ndim == 2
+    assert detections.shape[1] == 2
+    
+    # Verify stored responses
+    assert processor.rng_dop_resp_raw is not None
+    assert processor.rng_dop_resp is not None
+    assert isinstance(processor.rng_dop_resp_raw, np.ndarray)
+    assert isinstance(processor.rng_dop_resp, np.ndarray)
+    
+    # Check shapes
+    # Raw: (n_rx, n_range_bins, n_chirps)
+    # Mag: (n_range_bins, n_chirps)
+    n_rx = adc_cube.shape[0]
+    n_range_bins = processor.range_bins.shape[0]
+    n_chirps = processor.vel_bins.shape[0]
+    
+    assert processor.rng_dop_resp_raw.shape == (n_rx, n_range_bins, n_chirps)
+    assert processor.rng_dop_resp.shape == (n_range_bins, n_chirps)
+    
+    print(f"RangeDopplerDetector test passed. Found {len(detections)} detections.")
