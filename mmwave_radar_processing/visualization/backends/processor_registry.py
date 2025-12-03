@@ -15,7 +15,7 @@ from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerPr
 from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.range_resp import RangeProcessor
-from mmwave_radar_processing.processors.range_doppler_detector import RangeDopplerDetector
+from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
 from mmwave_radar_processing.processors.point_cloud_generator import PointCloudGenerator
 
 
@@ -123,10 +123,10 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             num_frames_history=1,
             view_keys=["angle_bins", "vel_bins"],
         ),
-        "range_doppler_detector": ProcessorSpec(
-            key="range_doppler_detector",
-            display_name="Range-Doppler Detector",
-            processor_cls=RangeDopplerDetector,
+        "range_doppler_detector_2d": ProcessorSpec(
+            key="range_doppler_detector_2d",
+            display_name="Range-Doppler Detector 2D",
+            processor_cls=RangeDopplerDetector2D,
             view_cls=RangeDopplerDetectorView,
             required_inputs="adc_cube",
             output_schema="N x 2 ndarray (detections)",

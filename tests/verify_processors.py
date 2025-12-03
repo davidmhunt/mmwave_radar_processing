@@ -153,10 +153,10 @@ def test_point_cloud_generator_real_data(config_manager,adc_cube):
 def test_range_doppler_detector(config_manager, adc_cube):
     """Test the RangeDopplerDetector processor."""
     print("Testing RangeDopplerDetector...")
-    from mmwave_radar_processing.processors.range_doppler_detector import RangeDopplerDetector
+    from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
     
     # Initialize processor
-    processor = RangeDopplerDetector(
+    processor = RangeDopplerDetector2D(
         config_manager=config_manager,
         cfar_type="ca_cfar_2d",
         cfar_params={"num_train": (4, 4), "num_guard": (2, 2), "pfa": 1e-5}

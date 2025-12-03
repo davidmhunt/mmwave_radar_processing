@@ -131,7 +131,7 @@ def test_range_response_view(qapp):
     expected_db = 20 * np.log10(np.maximum(np.abs(data), 1e-12))
     assert np.allclose(y_data_db, expected_db)
 
-def test_range_doppler_detector_view(qapp):
+def test_range_doppler_detector_2d_view(qapp):
     from mmwave_radar_processing.visualization.views.range_doppler_detector_view import RangeDopplerDetectorView
     view = RangeDopplerDetectorView()
     # Data: [range, velocity] = [50, 60]

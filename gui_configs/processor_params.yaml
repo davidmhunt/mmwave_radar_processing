@@ -20,13 +20,33 @@ processors:
     precise_vel_range: [-0.25, 0.25]
   range_resp:
     chirp_idx: 0
-  range_doppler_detector:
+  range_detector:
+    cfar_type: "os_cfar_1d"
+    cfar_params:
+      num_train: 5
+      num_guard: 3
+      rho: 0.5
+      alpha: 2
+  range_doppler_detector_2d:
     cfar_type: "os_cfar_2d"
     cfar_params:
       num_train: [7,7]
       num_guard: [4,4]
       rho: 0.7
       alpha: 5
+  range_doppler_detector_sequential:
+    rng_cfar_type: "os_cfar_1d"
+    rng_cfar_params:
+      num_train: 5
+      num_guard: 3
+      rho: 0.5
+      alpha: 2
+    vel_cfar_type: "os_cfar_1d"
+    vel_cfar_params:
+      num_train: 4
+      num_guard: 2
+      rho: 0.8
+      alpha: 3
   point_cloud_generator:
     cfar_type: "os_cfar_2d"
     cfar_params:

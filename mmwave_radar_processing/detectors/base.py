@@ -40,7 +40,7 @@ class BaseCFAR1D(ABC):
         Perform detection on the input 1D signal.
 
         Args:
-            x (np.ndarray): 1D input signal (magnitude or power).
+            x (np.ndarray): 1D input signal (magnitude).
 
         Returns:
             List[int]: List of indices where detections occurred.

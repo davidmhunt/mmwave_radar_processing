@@ -2,10 +2,10 @@
 import numpy as np
 from typing import Dict, List, Union, Optional
 
-from mmwave_radar_processing.processors.range_doppler_detector import RangeDopplerDetector
+from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.logging.logger import get_logger
-class PointCloudGenerator(RangeDopplerDetector):
+class PointCloudGenerator(RangeDopplerDetector2D):
     """
     Generates a 3D point cloud from raw ADC data using a standard radar signal processing pipeline.
     

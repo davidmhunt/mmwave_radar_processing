@@ -10,13 +10,13 @@ from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.logging.logger import get_logger
 
 
-class RangeDopplerDetector(RangeDopplerProcessor):
+class RangeDopplerDetector2D(RangeDopplerProcessor):
     """
-    Processor that performs Range-Doppler processing followed by CFAR detection.
+    Processor that performs Range-Doppler processing followed by 2D CFAR detection.
     
-    This processor computes the Range-Doppler response and then applies a CFAR
-    detector to identify targets. It stores the raw and magnitude Range-Doppler
-    responses as class attributes for later access.
+    This processor computes the Range-Doppler response and then applies a 2D CFAR
+    detector to directly detect objects in the range-doppler response. It stores the 
+    raw and magnitude Range-Doppler responses as class attributes for later access.
     """
 
     def __init__(

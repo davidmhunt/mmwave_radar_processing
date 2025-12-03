@@ -18,7 +18,6 @@ class RangeProcessor(_Processor):
         """
         self.num_range_bins = None
         self.range_bins = None
-        self.virtual_array_reformatter = None
         super().__init__(config_manager)
 
     def configure(self):
