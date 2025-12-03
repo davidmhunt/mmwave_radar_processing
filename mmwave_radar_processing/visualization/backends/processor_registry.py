@@ -15,6 +15,8 @@ from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerPr
 from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProcessor
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.range_resp import RangeProcessor
+from mmwave_radar_processing.processors.range_doppler_detector import RangeDopplerDetector
+from mmwave_radar_processing.processors.point_cloud_generator import PointCloudGenerator
 
 
 @dataclass
@@ -57,6 +59,12 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
     )
     from mmwave_radar_processing.visualization.views.range_response_view import (
         RangeResponseView,
+    )
+    from mmwave_radar_processing.visualization.views.range_doppler_detector_view import (
+        RangeDopplerDetectorView,
+    )
+    from mmwave_radar_processing.visualization.views.point_cloud_view import (
+        PointCloudView,
     )
 
     registry = {
@@ -114,6 +122,28 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             enabled=True,
             num_frames_history=1,
             view_keys=["angle_bins", "vel_bins"],
+        ),
+        "range_doppler_detector": ProcessorSpec(
+            key="range_doppler_detector",
+            display_name="Range-Doppler Detector",
+            processor_cls=RangeDopplerDetector,
+            view_cls=RangeDopplerDetectorView,
+            required_inputs="adc_cube",
+            output_schema="N x 2 ndarray (detections)",
+            enabled=True,
+            num_frames_history=1,
+            view_keys=["range_bins", "vel_bins", "dets", "rng_dop_resp"],
+        ),
+        "point_cloud_generator": ProcessorSpec(
+            key="point_cloud_generator",
+            display_name="Point Cloud",
+            processor_cls=PointCloudGenerator,
+            view_cls=PointCloudView,
+            required_inputs="adc_cube",
+            output_schema="N x 4 ndarray (x, y, z, vel)",
+            enabled=True,
+            num_frames_history=1,
+            view_keys=[], # Point cloud view handles raw array or dict
         ),
     }
     logger.debug("Default processor registry created with keys: %s", list(registry.keys()))

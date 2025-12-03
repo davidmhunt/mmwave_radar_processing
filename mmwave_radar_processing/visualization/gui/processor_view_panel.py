@@ -48,6 +48,9 @@ class ProcessorViewPanel(QWidget):
         # Store layout containers for each cell to easily swap widgets
         self.cell_layouts: Dict[tuple[int, int], QVBoxLayout] = {}
         
+        # Store latest payloads for each processor key
+        self.latest_payloads: Dict[str, Any] = {}
+        
         self._init_views()
         self._init_ui()
         self.populate_placeholder_data()
@@ -182,6 +185,10 @@ class ProcessorViewPanel(QWidget):
             new_widget.setVisible(True)
             # Force layout update
             layout.update()
+            
+            # Update with latest data if available
+            if new_key in self.latest_payloads:
+                new_widget.set_data(self.latest_payloads[new_key])
         
         self.active_views[(row, col)] = new_key
         self.logger.debug("Cell (%d, %d) changed to %s", row, col, new_key)
@@ -193,6 +200,9 @@ class ProcessorViewPanel(QWidget):
             key: Registry key of the view.
             payload: Data payload.
         """
+        # Cache the payload
+        self.latest_payloads[key] = payload
+
         # Check if this view is active in any cell
         is_active = False
         for active_key in self.active_views.values():

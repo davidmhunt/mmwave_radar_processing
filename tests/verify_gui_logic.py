@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 import pytest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QComboBox
 
 # Import views
 from mmwave_radar_processing.visualization.views.range_angle_view import RangeAngleView
@@ -130,3 +130,113 @@ def test_range_response_view(qapp):
     _, y_data_db = view.curve.getData()
     expected_db = 20 * np.log10(np.maximum(np.abs(data), 1e-12))
     assert np.allclose(y_data_db, expected_db)
+
+def test_range_doppler_detector_view(qapp):
+    from mmwave_radar_processing.visualization.views.range_doppler_detector_view import RangeDopplerDetectorView
+    view = RangeDopplerDetectorView()
+    # Data: [range, velocity] = [50, 60]
+    data = np.random.rand(50, 60)
+    # Detections: [range_idx, vel_idx]
+    dets = np.array([[10, 20], [30, 40]])
+    
+    payload = {
+        "data": dets, # Processor returns detections as primary data
+        "rng_dop_resp": data, # Heatmap provided separately
+        "range_bins": np.linspace(0, 10, 50),
+        "vel_bins": np.linspace(-5, 5, 60),
+        "dets": dets
+    }
+    view.set_data(payload)
+    
+    # Check heatmap image shape (should be [velocity, range] = [60, 50])
+    image_data = view.image.image
+    assert image_data.shape == (60, 50)
+    assert np.allclose(image_data, data.T)
+    
+    # Check scatter plot data
+    x_data = view.scatter.data['x']
+    y_data = view.scatter.data['y']
+    
+    assert len(x_data) == 2
+    assert len(y_data) == 2
+    
+    # Check values
+    expected_x = payload["vel_bins"][dets[:, 1]]
+    expected_y = payload["range_bins"][dets[:, 0]]
+    
+    assert np.allclose(x_data, expected_x)
+    assert np.allclose(y_data, expected_y)
+
+def test_point_cloud_view(qapp):
+    from mmwave_radar_processing.visualization.views.point_cloud_view import PointCloudView
+    view = PointCloudView()
+    
+    # Data: N x 4 (x, y, z, vel)
+    data = np.random.rand(10, 4)
+    payload = {"data": data}
+    
+    view.set_data(payload)
+    
+    # Check scatter plot data
+    pos = view.scatter.pos
+    assert pos.shape == (10, 3)
+    assert np.allclose(pos, data[:, :3])
+    
+    # Check colors (should be set)
+    color = view.scatter.color
+    assert color.shape == (10, 4)
+    
+    # Check color bar existence
+    assert hasattr(view, 'cb_widget')
+    assert hasattr(view, 'cb_plot')
+    assert hasattr(view, 'cb_img')
+    
+    # Check for ThickerAxisItem
+    from mmwave_radar_processing.visualization.views.point_cloud_view import ThickerAxisItem
+    found_axis = False
+    for item in view.plot.items:
+        if isinstance(item, ThickerAxisItem):
+            found_axis = True
+            break
+    assert found_axis
+
+def test_processor_view_panel_caching(qapp):
+    from mmwave_radar_processing.visualization.gui.processor_view_panel import ProcessorViewPanel
+    from mmwave_radar_processing.visualization.backends.processor_registry import get_default_registry
+    
+    registry = get_default_registry()
+    panel = ProcessorViewPanel(registry)
+    panel.show()
+    
+    # Simulate incoming data for a view that is NOT currently visible
+    # micro_doppler_resp is not in the default 2x2 grid
+    key = "micro_doppler_resp"
+    payload = {
+        "data": np.zeros((10, 10)),
+        "time_bins": np.arange(10),
+        "vel_bins": np.arange(10)
+    }
+    
+    # Update panel (should cache but NOT update widget since it's hidden)
+    panel.handle_view_update(key, payload)
+    assert key in panel.latest_payloads
+    assert panel.latest_payloads[key] is payload
+    
+    widget = panel.view_widgets[key]
+    # Ensure it didn't get updated yet (last_payload is placeholder data, not our new payload)
+    assert widget.last_payload is not payload
+    
+    # Now select the view in cell (0, 0)
+    layout = panel.layout()
+    item = layout.itemAtPosition(0, 0)
+    cell_widget = item.widget()
+    combo = cell_widget.findChild(QComboBox)
+    
+    # Set to the key
+    index = combo.findData(key)
+    combo.setCurrentIndex(index)
+    
+    # Check if the widget got the data
+    assert widget.isVisible()
+    # RangeDopplerView stores last_payload in BaseView
+    assert widget.last_payload is payload
