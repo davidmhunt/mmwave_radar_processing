@@ -265,6 +265,60 @@ def test_altitude_view(qapp):
     view.set_data(payload)
     assert not view.altitude_line.isVisible()
 
+def test_range_doppler_ground_detector_sequential(qapp):
+    from mmwave_radar_processing.processors.range_doppler_ground_detector import RangeDopplerGroundDetector
+    from mmwave_radar_processing.visualization.views.range_doppler_detector_view import RangeDopplerDetectorView
+    
+    # We won't instantiate the full processor here as it requires a complex config manager and mocks.
+    # Instead, we'll verify the view handles the expected payload structure.
+    
+    view = RangeDopplerDetectorView()
+    
+    # Data: [range, velocity] = [50, 60]
+    data = np.random.rand(50, 60)
+    # Detections: [range_idx, vel_idx]
+    dets = np.array([[10, 20], [30, 40]])
+    
+    payload = {
+        "data": dets, # Processor returns detections as primary data
+        "rng_dop_resp": data, # Heatmap provided separately
+        "range_bins": np.linspace(0, 10, 50),
+        "vel_bins": np.linspace(-5, 5, 60),
+        "dets": dets
+    }
+    
+    view.set_data(payload)
+    
+    # Check heatmap image shape
+    image_data = view.image.image
+    assert image_data.shape == (60, 50)
+    
+    # Check scatter plot data
+    x_data = view.scatter.data['x']
+    y_data = view.scatter.data['y']
+    assert len(x_data) == 2
+    assert len(y_data) == 2
+
+def test_ground_point_cloud_generator_view(qapp):
+    from mmwave_radar_processing.visualization.views.point_cloud_view import PointCloudView
+    
+    view = PointCloudView()
+    
+    # Data: N x 4 array (x, y, z, vel)
+    data = np.random.rand(10, 4)
+    
+    payload = {
+        "data": data
+    }
+    
+    view.set_data(payload)
+    
+    # Check scatter plot data
+    # PointCloudView uses GLScatterPlotItem, accessing data is a bit different
+    # We check if pos is set correctly
+    assert view.scatter.pos.shape == (10, 3)
+    assert np.allclose(view.scatter.pos, data[:, :3])
+
 def test_processor_view_panel_caching(qapp):
     from mmwave_radar_processing.visualization.gui.processor_view_panel import ProcessorViewPanel
     from mmwave_radar_processing.visualization.backends.processor_registry import get_default_registry

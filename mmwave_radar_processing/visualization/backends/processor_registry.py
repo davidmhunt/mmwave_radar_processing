@@ -18,9 +18,11 @@ from mmwave_radar_processing.processors.range_resp import RangeProcessor
 from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
 from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
 from mmwave_radar_processing.processors.range_doppler_detector_sequential import RangeDopplerDetectorSequential
+from mmwave_radar_processing.processors.range_doppler_ground_detector import RangeDopplerGroundDetector
 from mmwave_radar_processing.processors.range_detector import RangeDetector
 from mmwave_radar_processing.processors.altimeter import Altimeter
 from mmwave_radar_processing.processors.point_cloud_generator import PointCloudGenerator
+from mmwave_radar_processing.processors.ground_point_cloud_generator import GroundPointCloudGenerator
 
 
 @dataclass
@@ -98,7 +100,18 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             output_schema="range_bins ndarray",
             enabled=True,
             num_frames_history=1,
-            view_keys=["range_bins"],
+            view_keys=["data"],
+        ),
+        "ground_point_cloud_generator": ProcessorSpec(
+            key="ground_point_cloud_generator",
+            display_name="Ground Point Cloud",
+            processor_cls=GroundPointCloudGenerator,
+            view_cls=PointCloudView,
+            required_inputs="adc_cube",
+            output_schema="N x 4 ndarray (x, y, z, vel)",
+            enabled=True,
+            num_frames_history=1,
+            view_keys=["data"],
         ),
         "range_angle_resp": ProcessorSpec(
             key="range_angle_resp",
@@ -148,6 +161,17 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             key="range_doppler_detector_sequential",
             display_name="Range-Doppler Detector Sequential",
             processor_cls=RangeDopplerDetectorSequential,
+            view_cls=RangeDopplerDetectorView,
+            required_inputs="adc_cube",
+            output_schema="N x 2 ndarray (detections)",
+            enabled=True,
+            num_frames_history=1,
+            view_keys=["range_bins", "vel_bins", "dets", "rng_dop_resp"],
+        ),
+        "range_doppler_ground_detector": ProcessorSpec(
+            key="range_doppler_ground_detector",
+            display_name="Range-Doppler Ground Detector",
+            processor_cls=RangeDopplerGroundDetector,
             view_cls=RangeDopplerDetectorView,
             required_inputs="adc_cube",
             output_schema="N x 2 ndarray (detections)",
