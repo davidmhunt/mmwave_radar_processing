@@ -19,7 +19,7 @@ class RangeDopplerDetectorView(RangeDopplerView):
         
         # Add scatter plot item for detections
         self.scatter = pg.ScatterPlotItem(
-            size=10,
+            size=5,
             pen=pg.mkPen(None),
             brush=pg.mkBrush(255, 0, 0, 255), # Red
             symbol='o',

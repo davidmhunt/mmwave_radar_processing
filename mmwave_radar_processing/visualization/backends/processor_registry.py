@@ -16,6 +16,10 @@ from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProces
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.range_resp import RangeProcessor
 from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
+from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
+from mmwave_radar_processing.processors.range_doppler_detector_sequential import RangeDopplerDetectorSequential
+from mmwave_radar_processing.processors.range_detector import RangeDetector
+from mmwave_radar_processing.processors.altimeter import Altimeter
 from mmwave_radar_processing.processors.point_cloud_generator import PointCloudGenerator
 
 
@@ -62,6 +66,12 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
     )
     from mmwave_radar_processing.visualization.views.range_doppler_detector_view import (
         RangeDopplerDetectorView,
+    )
+    from mmwave_radar_processing.visualization.views.range_detector_view import (
+        RangeDetectorView,
+    )
+    from mmwave_radar_processing.visualization.views.altitude_view import (
+        AltitudeView,
     )
     from mmwave_radar_processing.visualization.views.point_cloud_view import (
         PointCloudView,
@@ -133,6 +143,39 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             enabled=True,
             num_frames_history=1,
             view_keys=["range_bins", "vel_bins", "dets", "rng_dop_resp"],
+        ),
+        "range_doppler_detector_sequential": ProcessorSpec(
+            key="range_doppler_detector_sequential",
+            display_name="Range-Doppler Detector Sequential",
+            processor_cls=RangeDopplerDetectorSequential,
+            view_cls=RangeDopplerDetectorView,
+            required_inputs="adc_cube",
+            output_schema="N x 2 ndarray (detections)",
+            enabled=True,
+            num_frames_history=1,
+            view_keys=["range_bins", "vel_bins", "dets", "rng_dop_resp"],
+        ),
+        "range_detector": ProcessorSpec(
+            key="range_detector",
+            display_name="Range Detector",
+            processor_cls=RangeDetector,
+            view_cls=RangeDetectorView,
+            required_inputs="adc_cube",
+            output_schema="range_bins ndarray (detections)",
+            enabled=True,
+            num_frames_history=1,
+            view_keys=["range_bins", "dets", "thresholds", "range_resp"],
+        ),
+        "altimeter": ProcessorSpec(
+            key="altimeter",
+            display_name="Altimeter",
+            processor_cls=Altimeter,
+            view_cls=AltitudeView,
+            required_inputs="adc_cube",
+            output_schema="float (altitude)",
+            enabled=True,
+            num_frames_history=1,
+            view_keys=["range_bins", "coarse_fft_data", "current_altitude_corrected_m"],
         ),
         "point_cloud_generator": ProcessorSpec(
             key="point_cloud_generator",

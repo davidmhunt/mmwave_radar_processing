@@ -167,6 +167,41 @@ def test_range_doppler_detector_2d_view(qapp):
     assert np.allclose(x_data, expected_x)
     assert np.allclose(y_data, expected_y)
 
+def test_range_detector_view(qapp):
+    from mmwave_radar_processing.visualization.views.range_detector_view import RangeDetectorView
+    view = RangeDetectorView()
+    
+    # Data: [range] = [100]
+    data = np.random.rand(100)
+    thresholds = np.random.rand(100) * 0.5
+    dets = np.array([10, 50, 80])
+    range_bins = np.linspace(0, 10, 100)
+    
+    payload = {
+        "range_resp": data,
+        "thresholds": thresholds,
+        "dets": dets,
+        "range_bins": range_bins
+    }
+    
+    view.set_data(payload)
+    
+    # Check signal curve
+    x_data, y_data = view.curve.getData()
+    assert np.allclose(y_data, np.abs(data))
+    
+    # Check threshold curve
+    x_thresh, y_thresh = view.threshold_curve.getData()
+    assert np.allclose(y_thresh, thresholds)
+    
+    # Check detections scatter
+    x_scat = view.scatter.data['x']
+    y_scat = view.scatter.data['y']
+    
+    assert len(x_scat) == 3
+    assert np.allclose(x_scat, range_bins[dets])
+    assert np.allclose(y_scat, np.abs(data[dets]))
+
 def test_point_cloud_view(qapp):
     from mmwave_radar_processing.visualization.views.point_cloud_view import PointCloudView
     view = PointCloudView()
@@ -199,6 +234,36 @@ def test_point_cloud_view(qapp):
             found_axis = True
             break
     assert found_axis
+
+def test_altitude_view(qapp):
+    from mmwave_radar_processing.visualization.views.altitude_view import AltitudeView
+    view = AltitudeView()
+    
+    # Data
+    coarse_fft = np.random.rand(100)
+    range_bins = np.linspace(0, 10, 100)
+    altitude = 5.5
+    
+    payload = {
+        "coarse_fft_data": coarse_fft,
+        "range_bins": range_bins,
+        "current_altitude_corrected_m": altitude
+    }
+    
+    view.set_data(payload)
+    
+    # Check signal curve
+    x_data, y_data = view.curve.getData()
+    assert np.allclose(y_data, np.abs(coarse_fft))
+    
+    # Check altitude line
+    assert view.altitude_line.value() == altitude
+    assert view.altitude_line.isVisible()
+    
+    # Test hidden line for invalid altitude
+    payload["current_altitude_corrected_m"] = -1.0
+    view.set_data(payload)
+    assert not view.altitude_line.isVisible()
 
 def test_processor_view_panel_caching(qapp):
     from mmwave_radar_processing.visualization.gui.processor_view_panel import ProcessorViewPanel

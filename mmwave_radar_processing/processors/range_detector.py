@@ -39,6 +39,9 @@ class RangeDetector(RangeProcessor):
         self.dets: Optional[np.ndarray] = None
         self.thresholds: Optional[np.ndarray] = None
 
+        #storage of the most recent range response
+        self.range_resp: Optional[np.ndarray] = None
+
         #initialize parent class
         super().__init__(config_manager)
 
@@ -64,9 +67,9 @@ class RangeDetector(RangeProcessor):
             np.ndarray: Magnitude of range FFT (range profile) for the selected RX channel.
         """
 
-        range_resp = super().process(adc_cube,chirp_idx=0)
+        self.range_resp = super().process(adc_cube,chirp_idx=0)
 
-        det_range_idxs = self.cfar_detector.detect(range_resp)
+        det_range_idxs = self.cfar_detector.detect(self.range_resp)
 
         #save the thresholds
         self.thresholds = self.cfar_detector.thresholds

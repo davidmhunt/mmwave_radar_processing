@@ -27,25 +27,31 @@ processors:
       num_guard: 3
       rho: 0.5
       alpha: 2
+  altimeter:
+    min_altitude_m: 25.0e-2
+    zoom_search_region_m: 20.0e-2
+    altitude_search_limit_m: 50e-2
+    range_bias: 0.0
+    precise_est_enabled: false
   range_doppler_detector_2d:
     cfar_type: "os_cfar_2d"
     cfar_params:
-      num_train: [7,7]
-      num_guard: [4,4]
+      num_train: [5,5]
+      num_guard: [3,2]
       rho: 0.7
-      alpha: 5
+      alpha: 2
   range_doppler_detector_sequential:
     rng_cfar_type: "os_cfar_1d"
     rng_cfar_params:
       num_train: 5
       num_guard: 3
-      rho: 0.5
+      rho: 0.6
       alpha: 2
     vel_cfar_type: "os_cfar_1d"
     vel_cfar_params:
-      num_train: 4
+      num_train: 5
       num_guard: 2
-      rho: 0.8
+      rho: 0.7
       alpha: 3
   point_cloud_generator:
     cfar_type: "os_cfar_2d"

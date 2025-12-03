@@ -28,9 +28,13 @@ The processor registry (`mmwave_radar_processing/visualization/backends/processo
 | `range_angle_resp` | `RangeAngleProcessor` | `RangeAngleView` | Active | |
 | `micro_doppler_resp` | `MicroDopplerProcessor` | `MicroDopplerView` | Active | Requires history buffer |
 | `doppler_azimuth_resp` | `DopplerAzimuthProcessor` | `DopplerAzimuthView` | Active | |
-| `altimeter` | `Altimeter` | `AltitudeView` | Planned | |
+| `altimeter` | `Altimeter` | `AltitudeView` | Active | |
 | `velocity_estimator` | `VelocityEstimator` | `VelocityView` | Planned | |
 | `strip_map_SAR` | `StripMapSARProcessor` | `SarView` | Planned | |
+| `range_doppler_detector_2d` | `RangeDopplerDetector2D` | `RangeDopplerDetectorView` | Active | |
+| `range_doppler_detector_sequential` | `RangeDopplerDetectorSequential` | `RangeDopplerDetectorView` | Active | |
+| `range_detector` | `RangeDetector` | `RangeDetectorView` | Active | |
+| `point_cloud_generator` | `PointCloudGenerator` | `PointCloudView` | Active | |
 
 ### Registry Description
 
@@ -131,6 +135,9 @@ All views inherit from `BaseView` in `mmwave_radar_processing/visualization/view
 3.  **RangeAngleView**: Displays Range-Angle heatmap. Expects `data` (2D array), `range_bins`, `angle_bins`.
 4.  **MicroDopplerView**: Displays Time-Velocity spectrogram. Expects `data` (2D array), `time_bins`, `vel_bins`.
 5.  **DopplerAzimuthView**: Displays Velocity-Angle heatmap. Expects `data` (2D array), `vel_bins`, `angle_bins`.
+6.  **RangeDopplerDetectorView**: Displays Range-Doppler heatmap with overlaid detections. Expects `data` (2D array), `range_bins`, `vel_bins`, `dets`.
+7.  **RangeDetectorView**: Displays Range profile with overlaid thresholds and detections. Expects `data` (1D array), `range_bins`, `thresholds`, `dets`.
+9.  **AltitudeView**: Displays coarse FFT with overlaid estimated altitude. Expects `coarse_fft` (1D array), `range_bins`, `current_altitude_corrected_m`.
 
 ### Creating a New View
 1.  Create a file `my_new_view.py` in `views/`.
@@ -205,6 +212,54 @@ processors:
     
   range_resp:
     chirp_idx: 0
+    
+  range_detector:
+    cfar_type: "os_cfar_1d"
+    cfar_params:
+      num_train: 5
+      num_guard: 3
+      rho: 0.5
+      alpha: 2
+      
+  altimeter:
+    min_altitude_m: 0.5
+    zoom_search_region_m: 1.0
+    altitude_search_limit_m: 2.0
+    range_bias: 0.0
+      
+  range_doppler_detector_2d:
+    cfar_type: "os_cfar_2d"
+    cfar_params:
+      num_train: [7,7]
+      num_guard: [4,4]
+      rho: 0.7
+      alpha: 5
+      
+  range_doppler_detector_sequential:
+    rng_cfar_type: "os_cfar_1d"
+    rng_cfar_params:
+      num_train: 5
+      num_guard: 3
+      rho: 0.5
+      alpha: 2
+    vel_cfar_type: "os_cfar_1d"
+    vel_cfar_params:
+      num_train: 4
+      num_guard: 2
+      rho: 0.8
+      alpha: 3
+      
+  point_cloud_generator:
+    cfar_type: "os_cfar_2d"
+    cfar_params:
+      num_train: [7,7]
+      num_guard: [4,4]
+      rho: 0.7
+      alpha: 5
+    az_antenna_idxs: [0,3,4,7]
+    el_antenna_idxs: [9,8,5,4]
+    shift_az_resp: true
+    shift_el_resp: false
 ```
 
 ## 7. Launch Scripts
