@@ -103,6 +103,7 @@ class PointCloudGenerator(_Processor):
 
         #compute the angle bins
         self.angle_bins = np.arcsin(self.phase_shifts / np.pi)
+    
 
     def process(self, adc_cube: np.ndarray, **kwargs) -> np.ndarray:
         """
@@ -235,3 +236,5 @@ class PointCloudGenerator(_Processor):
         Reset the processor state.
         """
         self.detector.reset()
+
+        return super().reset()

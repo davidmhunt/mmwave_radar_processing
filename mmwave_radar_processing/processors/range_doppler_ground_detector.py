@@ -52,6 +52,12 @@ class RangeDopplerGroundDetector(RangeDopplerDetector):
 
         self.logger.info(f"RangeDopplerDetectorSequential initialized with Velocity CFAR: {vel_cfar_type}")
 
+    def reset(self):
+
+        self.altimeter.reset()
+
+        return super().reset()
+    
     def _detect(self, adc_cube: np.ndarray, rng_dop_resp: np.ndarray, **kwargs) -> np.ndarray:
         """
         Perform detection on the Range-Doppler response.
