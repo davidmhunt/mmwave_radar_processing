@@ -33,9 +33,8 @@ The processor registry (`mmwave_radar_processing/visualization/backends/processo
 | `strip_map_SAR` | `StripMapSARProcessor` | `SarView` | Planned | |
 | `range_doppler_detector_2d` | `RangeDopplerDetector2D` | `RangeDopplerDetectorView` | Active | |
 | `range_doppler_detector_sequential` | `RangeDopplerDetectorSequential` | `RangeDopplerDetectorView` | Active | |
-| `range_doppler_ground_detector_sequential` | `RangeDopplerGroundDetectorSequential` | `RangeDopplerDetectorView` | Active | |
+| `range_doppler_ground_detector` | `RangeDopplerGroundDetector` | `RangeDopplerDetectorView` | Active | |
 | `range_detector` | `RangeDetector` | `RangeDetectorView` | Active | |
-| `ground_point_cloud_generator` | `GroundPointCloudGenerator` | `PointCloudView` | Active | |
 | `point_cloud_generator` | `PointCloudGenerator` | `PointCloudView` | Active | |
 
 ### Registry Description
@@ -250,7 +249,7 @@ processors:
       num_guard: 2
       rho: 0.8
       alpha: 3
-  range_doppler_ground_detector_sequential:
+  range_doppler_ground_detector:
     vel_cfar_type: "os_cfar_1d"
     vel_cfar_params:
       num_train: 5
@@ -263,30 +262,15 @@ processors:
       altitude_search_limit_m: 50e-2
       range_bias: 0.0
       precise_est_enabled: false
-  ground_point_cloud_generator:
-    vel_cfar_type: "os_cfar_1d"
-    vel_cfar_params:
-      num_train: 5
-      num_guard: 3
-      rho: 0.6
-      alpha: 4
-    altimeter_params:
-      min_altitude_m: 25.0e-2
-      zoom_search_region_m: 20.0e-2
-      altitude_search_limit_m: 40e-2
-      range_bias: 0.0
-      precise_est_enabled: false
-    az_antenna_idxs: [0,3,4,7]
-    el_antenna_idxs: [9,8,5,4]
-    shift_az_resp: true
-    shift_el_resp: false
   point_cloud_generator:
-    cfar_type: "os_cfar_2d"
-    cfar_params:
-      num_train: [7,7]
-      num_guard: [4,4]
-      rho: 0.7
-      alpha: 5
+    detector_type: "range_doppler_detector_2d"
+    detector_params:
+      cfar_type: "os_cfar_2d"
+      cfar_params:
+        num_train: [7,7]
+        num_guard: [4,4]
+        rho: 0.7
+        alpha: 5
     az_antenna_idxs: [0,3,4,7]
     el_antenna_idxs: [9,8,5,4]
     shift_az_resp: true

@@ -22,7 +22,6 @@ from mmwave_radar_processing.processors.range_doppler_ground_detector import Ran
 from mmwave_radar_processing.processors.range_detector import RangeDetector
 from mmwave_radar_processing.processors.altimeter import Altimeter
 from mmwave_radar_processing.processors.point_cloud_generator import PointCloudGenerator
-from mmwave_radar_processing.processors.ground_point_cloud_generator import GroundPointCloudGenerator
 
 
 @dataclass
@@ -98,17 +97,6 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             view_cls=RangeResponseView,
             required_inputs="adc_cube",
             output_schema="range_bins ndarray",
-            enabled=True,
-            num_frames_history=1,
-            view_keys=["data"],
-        ),
-        "ground_point_cloud_generator": ProcessorSpec(
-            key="ground_point_cloud_generator",
-            display_name="Ground Point Cloud",
-            processor_cls=GroundPointCloudGenerator,
-            view_cls=PointCloudView,
-            required_inputs="adc_cube",
-            output_schema="N x 4 ndarray (x, y, z, vel)",
             enabled=True,
             num_frames_history=1,
             view_keys=["data"],

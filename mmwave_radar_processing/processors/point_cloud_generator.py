@@ -2,16 +2,18 @@
 import numpy as np
 from typing import Dict, List, Union, Optional
 
-from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
+from mmwave_radar_processing.processors._processor import _Processor
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.logging.logger import get_logger
-class PointCloudGenerator(RangeDopplerDetector2D):
+from mmwave_radar_processing.processors.range_doppler_detector_registry import get_range_doppler_detector_registry
+
+class PointCloudGenerator(_Processor):
     """
     Generates a 3D point cloud from raw ADC data using a standard radar signal processing pipeline.
     
     Pipeline steps:
-    1. Range-Doppler Processing
-    2. CFAR Detection
+    1. Range-Doppler Processing (delegated to detector)
+    2. CFAR Detection (delegated to detector)
     3. Angle Estimation (Azimuth & Elevation)
     4. Coordinate Transformation (Spherical -> Cartesian)
     """
@@ -21,11 +23,11 @@ class PointCloudGenerator(RangeDopplerDetector2D):
         config_manager: ConfigManager,
         az_antenna_idxs: Union[List[int], np.ndarray],
         el_antenna_idxs: Union[List[int], np.ndarray],
+        detector_type: str = "range_doppler_detector_2d",
+        detector_params: Dict = {},
         shift_az_resp: bool = True,
         shift_el_resp: bool = False,
         num_angle_bins: int = 64,
-        cfar_type: str = "ca_cfar_2d",
-        cfar_params: Dict = {},
         **kwargs
     ):
         """
@@ -33,8 +35,8 @@ class PointCloudGenerator(RangeDopplerDetector2D):
 
         Args:
             config_manager (ConfigManager): Radar configuration manager.
-            cfar_type (str): Key for the CFAR detector in the registry.
-            cfar_params (Dict): Parameters to initialize the CFAR detector.
+            detector_type (str): Key for the Range-Doppler detector in the registry.
+            detector_params (Dict): Parameters to initialize the detector.
             num_angle_bins (int): Number of angle bins for angular response.
             az_antenna_idxs (Union[List[int], np.ndarray]): Indices of azimuth antennas.
             el_antenna_idxs (Union[List[int], np.ndarray]): Indices of elevation antennas.
@@ -42,6 +44,8 @@ class PointCloudGenerator(RangeDopplerDetector2D):
             shift_el_resp (bool): Whether to fftshift the elevation response.
             **kwargs: Additional keyword arguments.
         """
+
+        self.logger = get_logger(__name__)
               
         self.shift_az_resp = shift_az_resp
         self.shift_el_resp = shift_el_resp
@@ -70,22 +74,23 @@ class PointCloudGenerator(RangeDopplerDetector2D):
         self.phase_shifts:np.ndarray = None
         self.angle_bins:np.ndarray = None
         
-        super().__init__(
-            config_manager,
-            cfar_type=cfar_type,
-            cfar_params=cfar_params,
-            **kwargs
-        )
+        # Initialize Range-Doppler Detector
+        registry = get_range_doppler_detector_registry()
+        if detector_type not in registry:
+            raise ValueError(f"Unknown detector type: {detector_type}. Available: {list(registry.keys())}")
+            
+        detector_cls = registry[detector_type]
+        self.detector = detector_cls(config_manager, **detector_params)
         
-        self.logger.info(f"PointCloudGenerator initialized")
+        self.logger.info(f"PointCloudGenerator initialized with detector: {detector_type}")
+        
+        super().__init__(config_manager)
 
     def configure(self):
         """
         Configure the processor.
         """
-
-        #initialize the parent classes
-        super().configure()
+        self.detector.configure()
 
         self.phase_shifts = np.arange(
             start=np.pi,
@@ -99,7 +104,6 @@ class PointCloudGenerator(RangeDopplerDetector2D):
         #compute the angle bins
         self.angle_bins = np.arcsin(self.phase_shifts / np.pi)
 
-    
     def process(self, adc_cube: np.ndarray, **kwargs) -> np.ndarray:
         """
         Process the ADC cube to generate a point cloud.
@@ -112,24 +116,22 @@ class PointCloudGenerator(RangeDopplerDetector2D):
             np.ndarray: Generated point cloud in cartesian coordinates (x,y,z,vel).
         """
 
-        #1. Compute Range-Doppler Response and Detections
-        dets = super().process(
-            adc_cube=adc_cube,
-            **kwargs    
-        )
-
+        # 1. Compute Range-Doppler Response and Detections using the composed detector
+        dets = self.detector.process(adc_cube, **kwargs)
+        
         if dets.shape[0] == 0:
             return np.empty((0, 4))
 
-        # 3. Map detections to range/velocity bins
-        det_ranges, det_velocities, det_range_idxs, det_velocity_idxs = self._map_detections_to_bins(dets)
+        # 2. Map detections to range/velocity bins (using detector's helper)
+        det_ranges, det_velocities, det_range_idxs, det_velocity_idxs = self.detector._map_detections_to_bins(dets)
 
-        # 4. Angle Estimation (Vectorized)
+        # 3. Angle Estimation (Vectorized)
+        # We access the raw response from the detector
         az_angles, el_angles = self._compute_angle_estimation(
-            self.rng_dop_resp_raw, det_range_idxs, det_velocity_idxs
+            self.detector.rng_dop_resp_raw, det_range_idxs, det_velocity_idxs
         )
 
-        # 5. Coordinate Transformation (Spherical -> Cartesian)
+        # 4. Coordinate Transformation (Spherical -> Cartesian)
         dets_cartesian = self._convert_to_cartesian(
             det_ranges, az_angles, el_angles, det_velocities
         )
@@ -232,4 +234,4 @@ class PointCloudGenerator(RangeDopplerDetector2D):
         """
         Reset the processor state.
         """
-        super().reset()
+        self.detector.reset()

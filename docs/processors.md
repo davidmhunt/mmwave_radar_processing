@@ -10,11 +10,14 @@ The following table summarizes the current status of each processor, its compati
 | :--- | :--- | :--- |
 | **RangeProcessor** | `range_response_view` | None |
 | **RangeDopplerProcessor** | `range_doppler_view` | None |
+| **RangeDopplerDetector2D** | `range_doppler_detector_view` | None |
+| **RangeDopplerDetectorSequential** | `range_doppler_detector_view` | None |
+| **RangeDopplerGroundDetector** | `range_doppler_detector_view` | None |
 | **RangeAngleProcessor** | `range_angle_view` | None |
 | **DopplerAzimuthProcessor** | `doppler_azimuth_view` | Investigate scaling factor in zoom FFT. |
 | **MicroDopplerProcessor** | `micro_doppler_view` | None |
-| **PointCloudProcessor** | None | Implementation pending |
-| **Altimeter** | None | None |
+| **PointCloudGenerator** | `point_cloud_view` | None |
+| **Altimeter** | `altitude_view` | None |
 | **VelocityEstimator** | None | Robust filtering, Standard array elevation support, ODS point-based estimation. |
 | **SyntheticArrayBeamformer** | None | Azimuth selection for interpolation, Calibration improvements. |
 | **StripMapSARProcessor** | None | None |
@@ -106,9 +109,51 @@ Generates a Range-Doppler map (2D FFT) to visualize targets in terms of their di
     ```python
     processor = RangeDopplerProcessor(config_manager)
     rd_map = processor.process(adc_cube)
+    processor = RangeDopplerProcessor(config_manager)
+    rd_map = processor.process(adc_cube)
     ```
 
-### RangeAngleProcessor
+### RangeDopplerDetector2D
+**File**: `processors/range_doppler_detector_2d.py`
+
+Inherits from `RangeDopplerDetector`. Performs Range-Doppler processing followed by 2D CFAR detection.
+
+*   **Essential Functions**:
+    *   `process(adc_cube)`: Computes Range-Doppler map and detects targets using 2D CFAR.
+
+*   **Usage**:
+    ```python
+    processor = RangeDopplerDetector2D(config_manager, cfar_type="ca_cfar_2d")
+    detections = processor.process(adc_cube)
+    ```
+
+### RangeDopplerDetectorSequential
+**File**: `processors/range_doppler_detector_sequential.py`
+
+Inherits from `RangeDopplerDetector`. Performs Range-Doppler processing followed by sequential CFAR detection (Range CFAR then Velocity CFAR).
+
+*   **Essential Functions**:
+    *   `process(adc_cube)`: Computes Range-Doppler map and detects targets using sequential CFAR.
+
+*   **Usage**:
+    ```python
+    processor = RangeDopplerDetectorSequential(config_manager, rng_cfar_type="os_cfar_1d", vel_cfar_type="os_cfar_1d")
+    detections = processor.process(adc_cube)
+    ```
+
+### RangeDopplerGroundDetector
+**File**: `processors/range_doppler_ground_detector.py`
+
+Inherits from `RangeDopplerDetector`. Specialized detector that estimates altitude first to limit the search space for ground targets.
+
+*   **Essential Functions**:
+    *   `process(adc_cube)`: Estimates altitude, limits search range, computes Range-Doppler map, and detects targets.
+
+*   **Usage**:
+    ```python
+    processor = RangeDopplerGroundDetector(config_manager, altimeter_params={...})
+    detections = processor.process(adc_cube)
+    ```
 **File**: `processors/range_angle_resp.py`
 
 Computes a Range-Angle map (2D FFT), often referred to as a Range-Azimuth map. It resolves targets in range and spatial angle.
@@ -207,7 +252,7 @@ Implements a standard radar signal processing pipeline to generate a 3D point cl
 
 *   **Usage**:
     ```python
-    processor = PointCloudProcessor(config_manager)
+    processor = PointCloudGenerator(config_manager, detector_type="range_doppler_detector_2d", detector_params={...})
     point_cloud = processor.process(adc_cube)
     ```
 *   **Changes to make**
