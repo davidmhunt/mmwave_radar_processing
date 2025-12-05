@@ -120,8 +120,11 @@ def test_point_cloud_generator_real_data(config_manager,adc_cube):
     
     pc_gen = PointCloudGenerator(
         config_manager=config_manager,
-        cfar_type="os_cfar_2d",
-        cfar_params={"num_train": (8, 4), "num_guard": (2, 1), "rho": 0.75, "alpha": 3.5},
+        detector_type="range_doppler_detector_2d",
+        detector_params={
+            "cfar_type": "os_cfar_2d",
+            "cfar_params": {"num_train": (8, 4), "num_guard": (2, 1), "rho": 0.75, "alpha": 3.5}
+        },
         num_angle_bins=64,
         az_antenna_idxs=[0, 1, 2, 3], # Assuming 4 RX
         el_antenna_idxs=[], # Assuming 2D only for now or no elevation processing if not configured

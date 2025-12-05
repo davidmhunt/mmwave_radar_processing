@@ -162,38 +162,54 @@ class PointCloudGenerator(_Processor):
         # 1. Extract raw data for all detections at once
         # Shape: (N_dets, N_antennas)
         # Transpose to get (N_dets, N_antennas) from (N_antennas, N_dets)
-        az_raw_batch = rng_dop_resp_raw[self.az_antenna_idxs][:, det_range_idxs, det_velocity_idxs].T
-        el_raw_batch = rng_dop_resp_raw[self.el_antenna_idxs][:, det_range_idxs, det_velocity_idxs].T
-
-        # 2. Prepare FFT inputs (Zero padding)
-        # Shape: (N_dets, num_angle_bins)
-        az_fft_input = np.zeros((num_dets, self.num_angle_bins), dtype=complex)
-        el_fft_input = np.zeros((num_dets, self.num_angle_bins), dtype=complex)
-
-        az_fft_input[:, :len(self.az_antenna_idxs)] = az_raw_batch
-        el_fft_input[:, :len(self.el_antenna_idxs)] = el_raw_batch
-
-        # 3. Compute FFTs along axis 1
-        # Azimuth
-        az_fft = np.fft.fft(az_fft_input, axis=1)
-        if self.shift_az_resp:
-            az_resp_batch = np.abs(np.fft.fftshift(az_fft, axes=1))
+        
+        # Handle Azimuth
+        if self.az_antenna_idxs.size == 0:
+            az_angles = np.zeros(num_dets)
+            az_raw_batch = np.zeros((num_dets, 0), dtype=complex) # Placeholder for shape consistency if needed later
         else:
-            az_resp_batch = np.abs(az_fft)
+            az_raw_batch = rng_dop_resp_raw[self.az_antenna_idxs][:, det_range_idxs, det_velocity_idxs].T
+
+        # Handle Elevation
+        if self.el_antenna_idxs.size == 0:
+            el_angles = np.zeros(num_dets)
+            el_raw_batch = np.zeros((num_dets, 0), dtype=complex)
+        else:
+            el_raw_batch = rng_dop_resp_raw[self.el_antenna_idxs][:, det_range_idxs, det_velocity_idxs].T
+
+        # 2. Process Azimuth
+        if self.az_antenna_idxs.size > 0:
+            # Prepare FFT inputs (Zero padding)
+            az_fft_input = np.zeros((num_dets, self.num_angle_bins), dtype=complex)
+            az_fft_input[:, :len(self.az_antenna_idxs)] = az_raw_batch
+
+            # Compute FFT along axis 1
+            az_fft = np.fft.fft(az_fft_input, axis=1)
+            if self.shift_az_resp:
+                az_resp_batch = np.abs(np.fft.fftshift(az_fft, axes=1))
+            else:
+                az_resp_batch = np.abs(az_fft)
+
+            # Find peak angles
+            az_angle_idxs = np.argmax(az_resp_batch, axis=1)
+            az_angles = self.angle_bins[az_angle_idxs]
             
-        # Elevation
-        el_fft = np.fft.fft(el_fft_input, axis=1)
-        if self.shift_el_resp:
-            el_resp_batch = np.abs(np.fft.fftshift(el_fft, axes=1))
-        else:
-            el_resp_batch = np.abs(el_fft)
+        # 3. Process Elevation
+        if self.el_antenna_idxs.size > 0:
+            # Prepare FFT inputs (Zero padding)
+            el_fft_input = np.zeros((num_dets, self.num_angle_bins), dtype=complex)
+            el_fft_input[:, :len(self.el_antenna_idxs)] = el_raw_batch
 
-        # 4. Find peak angles
-        az_angle_idxs = np.argmax(az_resp_batch, axis=1)
-        el_angle_idxs = np.argmax(el_resp_batch, axis=1)
+            # Compute FFT along axis 1
+            el_fft = np.fft.fft(el_fft_input, axis=1)
+            if self.shift_el_resp:
+                el_resp_batch = np.abs(np.fft.fftshift(el_fft, axes=1))
+            else:
+                el_resp_batch = np.abs(el_fft)
 
-        az_angles = self.angle_bins[az_angle_idxs]
-        el_angles = self.angle_bins[el_angle_idxs]
+            # Find peak angles
+            el_angle_idxs = np.argmax(el_resp_batch, axis=1)
+            el_angles = self.angle_bins[el_angle_idxs]
 
         return az_angles, el_angles
 
