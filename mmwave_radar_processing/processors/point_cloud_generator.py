@@ -5,7 +5,7 @@ from typing import Dict, List, Union, Optional
 from mmwave_radar_processing.processors._processor import _Processor
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.logging.logger import get_logger
-from mmwave_radar_processing.processors.range_doppler_detector_registry import get_range_doppler_detector_registry
+from mmwave_radar_processing.processors.range_doppler_detection.registry import get_range_doppler_detector_registry
 
 class PointCloudGenerator(_Processor):
     """

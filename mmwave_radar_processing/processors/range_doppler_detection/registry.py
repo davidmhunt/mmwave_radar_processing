@@ -2,10 +2,10 @@
 
 from typing import Dict, Type
 
-from mmwave_radar_processing.processors.range_doppler_detector import RangeDopplerDetector
-from mmwave_radar_processing.processors.range_doppler_detector_2d import RangeDopplerDetector2D
-from mmwave_radar_processing.processors.range_doppler_detector_sequential import RangeDopplerDetectorSequential
-from mmwave_radar_processing.processors.range_doppler_ground_detector import RangeDopplerGroundDetector
+from .range_doppler_detector import RangeDopplerDetector
+from .range_doppler_detector_2d import RangeDopplerDetector2D
+from .range_doppler_detector_sequential import RangeDopplerDetectorSequential
+from .range_doppler_ground_detector import RangeDopplerGroundDetector
 
 _RANGE_DOPPLER_DETECTOR_REGISTRY: Dict[str, Type[RangeDopplerDetector]] = {
     "range_doppler_detector_2d": RangeDopplerDetector2D,

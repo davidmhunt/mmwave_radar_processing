@@ -266,7 +266,7 @@ def test_altitude_view(qapp):
     assert not view.altitude_line.isVisible()
 
 def test_range_doppler_ground_detector_sequential(qapp):
-    from mmwave_radar_processing.processors.range_doppler_ground_detector import RangeDopplerGroundDetector
+    from mmwave_radar_processing.processors.range_doppler_detection.range_doppler_ground_detector import RangeDopplerGroundDetector
     from mmwave_radar_processing.visualization.views.range_doppler_detector_view import RangeDopplerDetectorView
     
     # We won't instantiate the full processor here as it requires a complex config manager and mocks.

@@ -50,10 +50,13 @@ Each entry in the registry is a `ProcessorSpec` object containing:
 - `num_frames_history`: Number of previous frames required (e.g., for Micro-Doppler).
 
 ### Adding a New View/Processor
-
+ 
 1.  **Implement Processor**: Create your processor class in `mmwave_radar_processing/processors/`. It must implement a `process(adc_cube, **kwargs)` method.
 2.  **Implement View**: Create your view class in `mmwave_radar_processing/visualization/views/` inheriting from `BaseView`. Implement `update_view(payload)`.
+    *   The `payload` dictionary will contain keys defined in your registry entry.
 3.  **Register**: Add a new entry to the `registry` dictionary in `mmwave_radar_processing/visualization/backends/processor_registry.py` with your new classes and specifications.
+    *   **Crucial Step**: Define `view_keys` in `ProcessorSpec`. These strings must match attributes of your processor instance. The `ViewController` will automatically extract these attributes after `process()` completes and pack them into the `payload` dict passed to your view.
+    *   Example: `view_keys=["range_bins", "doppler_bins", "heatmap"]`. Your processor must have `self.range_bins`, `self.doppler_bins`, and `self.heatmap`.
 
 ## 3. Backend Overview
 
@@ -277,7 +280,22 @@ processors:
     shift_el_resp: false
 ```
 
-## 7. Launch Scripts
+## 8. Verification & Tests
+
+ The GUI logic and views are tested in `tests/verify_gui_logic.py`. These tests verify that views correctly handle data payloads and render without crashing.
+
+ *   **`test_range_angle_view`**: Verifies 2D heatmap rendering and dB scaling for Range-Angle.
+ *   **`test_micro_doppler_view`**: Verifies spectrogram rendering.
+ *   **`test_doppler_azimuth_view`**: Verifies Doppler-Azimuth heatmap.
+ *   **`test_range_doppler_view`**: Verifies Range-Doppler heatmap.
+ *   **`test_range_response_view`**: Verifies 1D plot rendering.
+ *   **`test_range_doppler_detector_2d_view`**: Verifies heatmap + scatter plot for detections.
+ *   **`test_range_detector_view`**: Verifies signal plot + threshold line + detection scatter.
+ *   **`test_point_cloud_view`**: Verifies 3D scatter plot setup and axis rendering.
+ *   **`test_altitude_view`**: Verifies altitude line overlay on range profile.
+ *   **`test_processor_view_panel_caching`**: Verifies that the UI efficiently caches data for hidden views and updates them only when revealed.
+
+ ## 7. Launch Scripts
 
 ### `launch_mmwave_viewer.py`
 Located in `scripts/launch_mmwave_viewer.py`.

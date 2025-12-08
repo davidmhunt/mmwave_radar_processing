@@ -12,7 +12,8 @@ The following table summarizes the current status of each processor, its compati
 | **RangeDopplerProcessor** | `range_doppler_view` | None |
 | **RangeDopplerDetector2D** | `range_doppler_detector_view` | None |
 | **RangeDopplerDetectorSequential** | `range_doppler_detector_view` | None |
-| **RangeDopplerGroundDetector** | `range_doppler_detector_view` | None |
+| **RangeDopplerGroundDetector** | `range_doppler_detector_view` | Active |
+| **RangeDetector** | `range_detector_view` | Active |
 | **RangeAngleProcessor** | `range_angle_view` | None |
 | **DopplerAzimuthProcessor** | `doppler_azimuth_view` | Investigate scaling factor in zoom FFT. |
 | **MicroDopplerProcessor** | `micro_doppler_view` | None |
@@ -33,9 +34,16 @@ All processors should inherit from the base `_Processor` class defined in `_proc
 
 1.  **Inherit**: Create a new class inheriting from `_Processor`.
 2.  **Initialize**: Implement `__init__` to accept `ConfigManager` and other parameters. Call `super().__init__(config_manager)`.
+    *   Initialize any child processors (e.g., specific detectors) here.
+    *   Set up initial state variables (e.g., history buffers).
 3.  **Configure**: Implement the `configure()` method to set up internal state (bins, windows, pre-computed tables) based on the configuration.
+    *   This is called automatically by `__init__` in the base class, but can be recalled if config changes.
+    *   Example: Compute frequency axes, window functions, or calibration vectors.
 4.  **Process**: Implement the `process(self, adc_cube, **kwargs)` method. This is the main entry point that takes an ADC cube and returns the processed output.
+    *   Arguments should match the keys in `processor_params.yaml`.
+    *   Should return a NumPy array or a dictionary of arrays.
 5.  **Reset (Optional)**: Implement `reset()` to clear history or internal state if necessary.
+6.  **Update History (Optional)**: Use `self.update_history(estimated, ground_truth)` if you want to track performance over time (stored in `self.history_estimated` and `self.history_gt`).
 
 ### Example Template:
 
@@ -113,47 +121,39 @@ Generates a Range-Doppler map (2D FFT) to visualize targets in terms of their di
     rd_map = processor.process(adc_cube)
     ```
 
-### RangeDopplerDetector2D
-**File**: `processors/range_doppler_detector_2d.py`
+### Range-Doppler Detection Package
+**Module**: `processors.range_doppler_detection`
 
-Inherits from `RangeDopplerDetector`. Performs Range-Doppler processing followed by 2D CFAR detection.
+This package contains a hierarchy of processors designed to detect targets in the Range-Doppler domain. They all inherit from the abstract base class `RangeDopplerDetector`, which itself inherits from `RangeDopplerProcessor`.
 
-*   **Essential Functions**:
-    *   `process(adc_cube)`: Computes Range-Doppler map and detects targets using 2D CFAR.
+#### Class Hierarchy
+*   **`RangeDopplerDetector` (Abstract Base)**:
+    *   Inherits from `RangeDopplerProcessor`.
+    *   Computes the standard Range-Doppler response (Raw and Magnitude).
+    *   Defines the abstract `_detect()` method that subclasses must implement.
+    *   Provides helper methods like `_map_detections_to_bins` to convert bin indices to physical units.
+*   **`RangeDopplerDetector2D`**:
+    *   Implements `_detect()` using a 2D CFAR detector (e.g., CA-CFAR, OS-CFAR 2D) applied directly to the Range-Doppler map.
+*   **`RangeDopplerDetectorSequential`**:
+    *   Implements `_detect()` by first applying a 1D Range CFAR to finding range bins of interest, and then applying a 1D Velocity CFAR on the Doppler slices of those bins.
+*   **`RangeDopplerDetectorGroundDetector`**:
+    *   specialized detector that incorporates altitude estimation (via `Altimeter`) to limit the search space to the ground surface.
 
-*   **Usage**:
-    ```python
-    processor = RangeDopplerDetector2D(config_manager, cfar_type="ca_cfar_2d")
-    detections = processor.process(adc_cube)
-    ```
+#### Registry
+The package includes a registry system to dynamically load and configure detectors.
+*   **Registry File**: `processors/range_doppler_detection/registry.py`
+*   **Usage**: Wrappers like `PointCloudGenerator` use this registry to instantiate the configured detector type string (e.g., "range_doppler_detector_2d") from the configuration file.
 
-### RangeDopplerDetectorSequential
-**File**: `processors/range_doppler_detector_sequential.py`
+#### Usage
+These detectors are typically used as components within larger processors like `PointCloudGenerator`, but can be used independently.
 
-Inherits from `RangeDopplerDetector`. Performs Range-Doppler processing followed by sequential CFAR detection (Range CFAR then Velocity CFAR).
+```python
+from mmwave_radar_processing.processors.range_doppler_detection.range_doppler_detector_2d import RangeDopplerDetector2D
 
-*   **Essential Functions**:
-    *   `process(adc_cube)`: Computes Range-Doppler map and detects targets using sequential CFAR.
-
-*   **Usage**:
-    ```python
-    processor = RangeDopplerDetectorSequential(config_manager, rng_cfar_type="os_cfar_1d", vel_cfar_type="os_cfar_1d")
-    detections = processor.process(adc_cube)
-    ```
-
-### RangeDopplerGroundDetector
-**File**: `processors/range_doppler_ground_detector.py`
-
-Inherits from `RangeDopplerDetector`. Specialized detector that estimates altitude first to limit the search space for ground targets.
-
-*   **Essential Functions**:
-    *   `process(adc_cube)`: Estimates altitude, limits search range, computes Range-Doppler map, and detects targets.
-
-*   **Usage**:
-    ```python
-    processor = RangeDopplerGroundDetector(config_manager, altimeter_params={...})
-    detections = processor.process(adc_cube)
-    ```
+processor = RangeDopplerDetector2D(config_manager, cfar_type="ca_cfar_2d")
+detections = processor.process(adc_cube)
+# detections shape: (N, 2) -> [range_idx, doppler_idx]
+```
 **File**: `processors/range_angle_resp.py`
 
 Computes a Range-Angle map (2D FFT), often referred to as a Range-Azimuth map. It resolves targets in range and spatial angle.

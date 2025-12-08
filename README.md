@@ -136,3 +136,8 @@ By default, the GUI looks for datasets relative to the project root directory. Y
 - `--dataset-path`: Override the dataset path (default: from `dataset_params.yaml`)
 - `--config-name`: Override the radar config file (default: from `dataset_params.yaml`)
 - `--log-level`: Set logging level (default: INFO)
+
+### More Documentation
+For more detailed information on the GUI architecture, extending the viewer, and processor details, please refer to the documentation in the `docs/` folder:
+- [GUI Documentation](docs/GUI.md)
+- [Processors Documentation](docs/processors.md)

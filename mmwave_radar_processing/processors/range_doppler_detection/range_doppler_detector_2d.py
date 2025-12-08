@@ -3,7 +3,7 @@
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 
-from mmwave_radar_processing.processors.range_doppler_detector import RangeDopplerDetector
+from .range_doppler_detector import RangeDopplerDetector
 from mmwave_radar_processing.detectors.detector_registry import get_detector_registry
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.logging.logger import get_logger
