@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
         control_panel.dataset_selected.connect(self.controller.load_dataset)
         control_panel.config_selected.connect(self.controller.load_config)
         control_panel.params_selected.connect(lambda path: self.logger.info("Params file selected: %s", path))
+        control_panel.export_movie_requested.connect(lambda path: self.controller.export_movie(path, self))
         
         if self.dataset_path:
             control_panel.set_dataset_path(self.dataset_path)

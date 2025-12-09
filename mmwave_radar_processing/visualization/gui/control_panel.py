@@ -28,7 +28,10 @@ class ControlPanel(QWidget):
     dataset_selected = pyqtSignal(str)
     config_selected = pyqtSignal(str)
     params_selected = pyqtSignal(str)
+    config_selected = pyqtSignal(str)
+    params_selected = pyqtSignal(str)
     db_mode_changed = pyqtSignal(bool)
+    export_movie_requested = pyqtSignal(str)
 
     def __init__(
         self,
@@ -58,6 +61,11 @@ class ControlPanel(QWidget):
         dataset_browse = QPushButton("Browse")
         dataset_browse.clicked.connect(self._browse_dataset)
         dataset_layout.addRow("Root:", self._row_with_button(self.dataset_path_edit, dataset_browse))
+        
+        self.export_movie_btn = QPushButton("Export Dataset Movie")
+        self.export_movie_btn.clicked.connect(self._export_movie)
+        dataset_layout.addRow(self.export_movie_btn)
+        
         dataset_group.setLayout(dataset_layout)
         main_layout.addWidget(dataset_group)
 
@@ -124,6 +132,14 @@ class ControlPanel(QWidget):
     def _emit_db_mode(self) -> None:
         """Emit the dB mode state."""
         self.db_mode_changed.emit(self.db_checkbox.isChecked())
+
+    def _export_movie(self) -> None:
+        """Open a file dialog to save a movie."""
+        path, _ = QFileDialog.getSaveFileName(self, "Save Dataset Movie", filter="Video (*.mp4);;All Files (*)")
+        if path:
+            if not path.endswith(".mp4"):
+                path += ".mp4"
+            self.export_movie_requested.emit(path)
 
     def set_dataset_path(self, path: str) -> None:
         """Set the dataset path text."""

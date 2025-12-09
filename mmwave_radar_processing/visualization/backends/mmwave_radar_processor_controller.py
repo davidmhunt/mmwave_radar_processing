@@ -14,6 +14,7 @@ from mmwave_radar_processing.visualization.backends.processor_registry import (
 )
 from mmwave_radar_processing.visualization.models.config_model import ConfigModel
 from mmwave_radar_processing.visualization.models.dataset_model import DatasetModel
+from mmwave_radar_processing.visualization.backends.video_exporter import VideoExporter
 
 
 from mmwave_radar_processing.visualization.backends.view_controller import ViewController
@@ -298,3 +299,16 @@ class mmWaveRadarProcessorController(QObject):
             
         except Exception as exc:
             self.logger.error("Failed to load config: %s", exc)
+
+    def export_movie(self, output_path: str, target_widget: Any) -> None:
+        """Export the current dataset playback to a movie file.
+
+        Args:
+            output_path: Path to save the video.
+            target_widget: The widget to capture frames from.
+        """
+        try:
+            exporter = VideoExporter(self, target_widget, fps=20, logger=self.logger)
+            exporter.export(output_path)
+        except Exception as exc:
+            self.logger.error("Movie export failed: %s", exc)
