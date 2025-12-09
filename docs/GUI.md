@@ -280,7 +280,57 @@ processors:
     shift_el_resp: false
 ```
 
-## 8. Verification & Tests
+## 8. Video Export
+
+The GUI includes a pipeline to export the dataset visualization as an MP4 movie. This section describes the architecture and implementation details.
+
+### 8.1. Architecture
+
+The video export is orchestrated by a dedicated class that interfaces with the main controller to drive the playback and capture frames.
+
+*   **UI Entry Point** (`mmwave_radar_processing/visualization/gui/control_panel.py`):
+    *   **"Export Dataset Movie" Button**: Located in the Dataset control group.
+    *   **Signal**: Emits `export_movie_requested(str)` with the target file path.
+    *   **Logic**: Opens a `QFileDialog` to select the destination, ensuring the `.mp4` extension.
+
+*   **Controller Integration** (`mmwave_radar_processing/visualization/backends/mmwave_radar_processor_controller.py`):
+    *   **`export_movie(output_path, target_widget)`**: The main entry point in the controller.
+    *   It instantiates the `VideoExporter` with the controller itself (access to data/logic) and the target capture widget (the `MainWindow`).
+
+*   **Video Exporter** (`mmwave_radar_processing/visualization/backends/video_exporter.py`):
+    *   **Purpose**: A standalone class to keeping the export logic separate from the main controller.
+    *   **Dependencies**: Uses `imageio` with the `libx264` codec. requires `ffmpeg` installed on the system.
+
+### 8.2. Export Loop Logic
+
+The `VideoExporter.export()` method follows this sequence:
+
+1.  **Preparation**:
+    *   Validates the output path.
+    *   Saves the current frame index (`controller.last_processed_frame`) to restore it later.
+    *   Initializes the `imageio` writer.
+
+2.  **Frame Iteration**:
+    *   Loops from `0` to `total_frames`.
+    *   **Update State**: Calls `controller.process_next_frame(i)` to update all internal data models and view logic.
+    *   **Flush Events**: Calls `QApplication.processEvents()` to ensure the Qt event loop processes the paint events, updating the visual widgets. **This is critical**; without it, the captured frames would be stale or incomplete.
+    *   **Capture**: Calls `target_widget.grab()` (a Qt method) to render the widget into a `QPixmap`.
+    *   **Convert**: Converts the pixmap to a `QImage`, ensures `RGBA8888` format, and extracts the raw bytes into a NumPy array (discarding the alpha channel if not needed).
+    *   **Write**: Appends the NumPy array to the video writer.
+
+3.  **Cleanup**:
+    *   Closes the video writer.
+    *   Restores the timeline to the original frame index so the user doesn't lose their place.
+
+### 8.3. Implementation Notes for New Projects
+
+If implementing this in another repository:
+1.  **Decouple**: Create a separate `VideoExporter` class. Do not put the export loop inside your main window or controller class to avoid stiffle code.
+2.  **Re-use Logic**: Your exporter should drive the *existing* frame update logic (e.g., `controller.process_next_frame`). Do not duplicate data loading or processing logic inside the exporter.
+3.  **Process Events**: Always call `QApplication.processEvents()` after triggering a frame update and before grabbing the screen.
+4.  **Target Widget**: Capture the top-level window if you want the full context (sliders, control panels), or a specific sub-widget (e.g., just the plot area) if you want a cleaner video.
+
+## 9. Verification & Tests
 
  The GUI logic and views are tested in `tests/verify_gui_logic.py`. These tests verify that views correctly handle data payloads and render without crashing.
 
