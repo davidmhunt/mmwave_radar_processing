@@ -137,3 +137,82 @@ class AnalysisPlotter:
         if show:
             plt.show()
 
+    def plot_comparison_time_series(
+        self,
+        estimated: np.ndarray,
+        ground_truth: np.ndarray,
+        ax: plt.Axes,
+        title: str,
+        ylabel: str,
+        xlabel: str = "Frame Index",
+        est_label: str = "Estimated",
+        gt_label: str = "Ground Truth",
+        est_color: str = "blue",
+        gt_color: str = "black",
+        linestyle: str = "-"
+    ) -> None:
+        """
+        Plot both estimated and ground truth data on the same axes for comparison.
+
+        Args:
+            estimated (np.ndarray): 1D array of estimated values.
+            ground_truth (np.ndarray): 1D array of ground truth values.
+            ax (plt.Axes): Matplotlib axes.
+            title (str): Plot title.
+            ylabel (str): Y-axis label.
+            xlabel (str, optional): X-axis label. Defaults to "Frame Index".
+            est_label (str, optional): Legend label for estimated. Defaults to "Estimated".
+            gt_label (str, optional): Legend label for ground truth. Defaults to "Ground Truth".
+            est_color (str, optional): Color for estimated line. Defaults to "blue".
+            gt_color (str, optional): Color for ground truth line. Defaults to "black".
+            linestyle (str, optional): Line style. Defaults to "-".
+        """
+        ax.plot(estimated, label=est_label, color=est_color, linestyle=linestyle)
+        ax.plot(ground_truth, label=gt_label, color=gt_color, linestyle=linestyle, alpha=0.6)
+        
+        ax.set_title(title, fontsize=self.font_size_title)
+        ax.set_xlabel(xlabel, fontsize=self.font_size_axis_labels)
+        ax.set_ylabel(ylabel, fontsize=self.font_size_axis_labels)
+        ax.tick_params(axis='both', which='major', labelsize=self.font_size_ticks)
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=self.font_size_legend)
+
+    def plot_error_histograms(
+        self,
+        x_errors: np.ndarray,
+        y_errors: np.ndarray,
+        z_errors: np.ndarray,
+        bins: int = 30,
+        show: bool = True
+    ) -> None:
+        """
+        Plot histograms for X, Y, Z velocity errors.
+
+        Args:
+            x_errors (np.ndarray): X error array.
+            y_errors (np.ndarray): Y error array.
+            z_errors (np.ndarray): Z error array.
+            bins (int, optional): Number of bins. Defaults to 30.
+            show (bool, optional): Whether to display the plot. Defaults to True.
+        """
+        fig, axs = plt.subplots(3, 1, figsize=(10, 12))
+        
+        for i, (errors, label, color) in enumerate(zip(
+            [x_errors, y_errors, z_errors],
+            ["X Velocity Error", "Y Velocity Error", "Z Velocity Error"],
+            ["red", "green", "blue"]
+        )):
+            self.plot_error_distribution(
+                errors, 
+                axs[i], 
+                type="histogram", 
+                label=label, 
+                color=color, 
+                bins=bins
+            )
+            axs[i].set_title(f"{label} Distribution\nMean: {np.mean(errors):.4f}, Std: {np.std(errors):.4f}", fontsize=self.font_size_title)
+
+        plt.tight_layout()
+        if show:
+            plt.show()
+

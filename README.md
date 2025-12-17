@@ -149,18 +149,37 @@ To perform velocity estimation analysis, use the `scripts/test_vel_estimation.py
 ### Usage
 
 ```bash
-poetry run python scripts/test_vel_estimation.py
+poetry run python scripts/test_vel_estimation.py --config-name velocity_analysis_config.yaml
 ```
+
+**Arguments:**
+- `--config-name`: Name of the configuration file located in `analyzer_configs/`. Default: `velocity_analysis_config.yaml`.
+- `--plot-time-series-errors` / `--no-plot-time-series-errors`: Enable/disable plots showing X, Y, Z, and Norm errors over time. Default: Enabled.
+- `--plot-distributions` / `--no-plot-distributions`: Enable/disable CDF and Histogram plots of the error distribution. Default: Enabled.
+- `--plot-histograms` / `--no-plot-histograms`: Enable/disable explicit histogram plots for X, Y, and Z errors. Default: Enabled.
+- `--plot-comparison` / `--no-plot-comparison`: Enable/disable plots comparing Estimated vs Ground Truth velocities for each axis. Default: Enabled.
+- `--plot-stats` / `--no-plot-stats`: Enable/disable plots for R2 statistics and Inlier percentages over time. Default: Enabled.
 
 ### Configuration
 
-The analysis is configured via `analyzer_configs/velocity_analysis_config.yaml`. You can modify this file to change:
+The analysis is configured via `analyzer_configs/velocity_analysis_config.yaml`. Key sections include:
 
-- **Dataset**: Path and name of the dataset.
-- **Radar Config**: Radar configuration file and geometry ("ods" or "standard").
-- **Velocity Estimator**: R2 threshold and inlier percentage.
-- **Analysis Range**: Start and end frame indices for analysis.
-- **Transformations**: UAV velocity transformation matrix.
+- **dataset**:
+    - `path`: Root directory of the dataset.
+    - `name`: Name of the specific dataset folder.
+- **radar**: 
+    - `config_file`: Radar config file name.
+    - `array_geometry`: Antenna array geometry (e.g., "ods").
+- **processors**: Parameter dictionaries for specific processors:
+    - `velocity_estimator`: Thresholds for R2 and inliers.
+    - `point_cloud_generator`: Detection and CFAR parameters.
+- **analysis**:
+    - `start_idx`: Start frame index for analysis.
+    - `end_idx`: End frame index.
+    - `error_method`: Method for error calculation, either "signed" (Estimated - GT) or "absolute" (|Estimated - GT|).
+- **transformation**:
+    - `uav_vel_matrix`: 3x3 matrix to transform *Estimated* velocities into the desired frame.
+    - `gt_vel_matrix`: 3x3 matrix to transform *Ground Truth* velocities into the desired frame.
 
 ### Output
 
