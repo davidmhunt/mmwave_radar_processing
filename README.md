@@ -141,3 +141,32 @@ By default, the GUI looks for datasets relative to the project root directory. Y
 For more detailed information on the GUI architecture, extending the viewer, and processor details, please refer to the documentation in the `docs/` folder:
 - [GUI Documentation](docs/GUI.md)
 - [Processors Documentation](docs/processors.md)
+
+## Velocity Analysis
+
+To perform velocity estimation analysis, use the `scripts/test_vel_estimation.py` script. This script runs the velocity estimation pipeline on a dataset and generates performance metrics and plots compared to ground truth.
+
+### Usage
+
+```bash
+poetry run python scripts/test_vel_estimation.py
+```
+
+### Configuration
+
+The analysis is configured via `analyzer_configs/velocity_analysis_config.yaml`. You can modify this file to change:
+
+- **Dataset**: Path and name of the dataset.
+- **Radar Config**: Radar configuration file and geometry ("ods" or "standard").
+- **Velocity Estimator**: R2 threshold and inlier percentage.
+- **Analysis Range**: Start and end frame indices for analysis.
+- **Transformations**: UAV velocity transformation matrix.
+
+### Output
+
+The script will:
+1. Print summary statistics (Mean, Median, RMSE) for X, Y, Z, and Norm velocity errors to the console.
+2. Display plots for:
+   - Velocity Estimation vs Ground Truth (Time Series)
+   - R2 Statistics and Inlier Percentage
+   - Error Distribution (Histograms and CDFs)

@@ -1,0 +1,20 @@
+dataset:
+  path: "/data/Hermes"
+  name: "hermes_odom_test_1"
+
+radar:
+  config_file: "6843_RadVel_ods_10Hz.cfg"
+  array_geometry: "ods"
+  array_direction: "down"
+
+velocity_estimator:
+  min_r2_threshold: 0.2
+  min_inlier_percent: 0.5
+  
+analysis:
+  start_idx: 100
+  end_idx: 700
+  output_dir: "results"
+
+transformation:
+  uav_vel_matrix: [[0, 1, 0], [0, 0, -1], [1, 0, 0]] # [x, y, z] order input to [x, y, z] output
