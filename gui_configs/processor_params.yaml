@@ -6,7 +6,7 @@ processors:
   range_doppler_resp:
     rx_idx: 0
   micro_doppler_resp:
-    target_ranges: [3.0, 3.7]
+    target_ranges: [0.5, 2.0]
     num_frames_history: 20
     rx_idx: 0
   doppler_azimuth_resp:
