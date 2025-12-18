@@ -45,12 +45,13 @@ class RangeDopplerGroundDetector(RangeDopplerDetector):
             raise ValueError(f"Unknown CFAR type: {vel_cfar_type}. Available: {list(detector_registry.keys())}")
         detector_cls = detector_registry[vel_cfar_type]
         self.vel_detector = detector_cls(**vel_cfar_params)
+        self.logger.info(f"RangeDopplerGroundDetector initialized params: {vel_cfar_params}")
         
         #initialize the range response processor (for range detections)
         self.altimeter_params = altimeter_params
         self.altimeter = Altimeter(config_manager, **altimeter_params)
 
-        self.logger.info(f"RangeDopplerDetectorSequential initialized with Velocity CFAR: {vel_cfar_type}")
+        self.logger.info(f"RangeDopplerGroundDetector initialized with Velocity CFAR: {vel_cfar_type}")
 
     def reset(self):
 

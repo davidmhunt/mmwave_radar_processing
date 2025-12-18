@@ -56,10 +56,10 @@ processors:
   range_doppler_ground_detector:
     vel_cfar_type: "os_cfar_1d"
     vel_cfar_params:
-      num_train: 5
-      num_guard: 3
-      rho: 0.6
-      alpha: 4
+      num_train: 16
+      num_guard: 4
+      rho: 0.5
+      alpha: 12
     altimeter_params:
       min_altitude_m: 25.0e-2
       zoom_search_region_m: 20.0e-2
@@ -71,10 +71,10 @@ processors:
     detector_params:
       vel_cfar_type: "os_cfar_1d"
       vel_cfar_params:
-        num_train: 5
-        num_guard: 3
-        rho: 0.6
-        alpha: 4
+        num_train: 12
+        num_guard: 4
+        rho: 0.5
+        alpha: 15
       altimeter_params:
         min_altitude_m: 25.0e-2
         zoom_search_region_m: 20.0e-2
