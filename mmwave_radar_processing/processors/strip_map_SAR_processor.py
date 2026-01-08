@@ -9,8 +9,21 @@ class StripMapSARProcessor(_Processor):
 
     def __init__(self,
                  config_manager,
-                 az_angle_range_rad:np.ndarray = \
-                    np.deg2rad(np.array([-30,30]))):
+                 az_angle_range_rad: np.ndarray | list = \
+                    np.deg2rad(np.array([-30,30])),
+                 **kwargs):
+        """Initialize the StripMapSARProcessor.
+
+        Args:
+            config_manager (ConfigManager): The configuration manager.
+            az_angle_range_rad (np.ndarray | list, optional): Azimuth angle range in radians. 
+                Defaults to [-30, 30] degrees.
+            **kwargs: Additional keyword arguments.
+        """
+        
+        # Convert list to numpy array if necessary
+        if isinstance(az_angle_range_rad, list):
+            az_angle_range_rad = np.array(az_angle_range_rad)
         
         #virtual array re-formatter (for handling virtual arrays)
         if config_manager.virtual_antennas_enabled:
@@ -149,7 +162,8 @@ class StripMapSARProcessor(_Processor):
                 vel_m_per_s:float,
                 sensor_height_m:float = 0.24,
                 rx_index = 0,
-                max_SAR_distance:float = 1.5):
+                max_SAR_distance:float = 1.5,
+                **kwargs):
         
         if self.config_manager.virtual_antennas_enabled:
             adc_cube = self.virtual_array_reformatter.process(

@@ -19,7 +19,7 @@ sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt update
 ```
 
-3. Install python 3.12 along with the required development dependencies
+3. Install python 3.12 via deadsnakes
 ```
 sudo apt install python3.12 python3.12-dev
 ```
@@ -58,12 +58,11 @@ git submodule update --init
 1. Check to see if Python Poetry is installed. If the below command is successful, poetry is installed move on to setting up the conda environment
 
 ```
-    #for now ensure that it is lower than version 2.0 (TOML files are out of date)
     poetry --version
 ```
 2. If Python Poetry is not installed, follow the [Poetry Install Instructions](https://python-poetry.org/docs/#installing-with-the-official-installer). On linux, Poetry can be installed using the following command:
 ```
-curl -sSL https://install.python-poetry.org | python3 - --version 1.8.4
+curl -sSL https://install.python-poetry.org | python3 -
 ```
 
 If you are using poetry over an ssh connection or get an error in the following steps, try running the following command first and then continuing with the remainder fo the installation.
@@ -71,22 +70,21 @@ If you are using poetry over an ssh connection or get an error in the following 
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 ```
 
+Finally, make sure that poetry is installing everything into the environment (i.e. not using system packages)
+```
+poetry config virtualenvs.options.system-site-packages false
+```
+
 #### Installing mmwave_radar_processing
-Navigate to the mmwave_radar_processing foler (this folder) and execute the following command
-
 ```
-poetry install --extras "submodules"
-```
-
-If you get an an error saying: "Failed to unlock the collection!", execute the following command in the terminal:
-```
-export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
+cd mmwave_radar_processing
+poetry install --with submodules
 ```
 
 #### Updating mmwave_radar_processing
 If the pyproject.toml file is updated, the poetry installation must also be updated. Use the following commands to update the version of poetry
 ```
-poetry lock --no-update
+poetry lock
 poetry install
 ```
 
@@ -103,3 +101,91 @@ MOVIE_TEMP_DIRECTORY=/path/to/movie/temp/movie_temp_directory
 ANALYZER_TEMP_DIRECTORY=/path/to/temp/analyzer_directory
 ```
 3. Replace the example text with the path to your directory
+
+## Running Tests
+
+To run the unit tests, use the following command:
+
+```bash
+poetry run pytest tests/
+```
+
+Note: Since the tests involve GUI components, if you are running in a headless environment (e.g., SSH without X11 forwarding), you may need to set the `QT_QPA_PLATFORM` environment variable:
+
+```bash
+QT_QPA_PLATFORM=offscreen poetry run pytest tests/
+```
+
+## Launching the GUI
+To launch the GUI, use the `launch_mmwave_viewer.py` script:
+```bash
+poetry run python scripts/launch_mmwave_viewer.py   
+```
+
+### Configuration
+The GUI uses configuration files located in the `gui_configs` directory:
+- `dataset_params.yaml`: Defines the default dataset to load and its associated radar configuration.
+- `processor_params.yaml`: Defines parameters for the various signal processing modules.
+
+### Dataset Paths
+By default, the GUI looks for datasets relative to the project root directory. You can specify a different dataset using the `--dataset-path` argument or by updating `dataset_params.yaml`. Absolute paths are also supported.
+
+### Command Line Arguments
+- `--dataset-params`: Path to dataset parameters YAML (default: `gui_configs/dataset_params.yaml`)
+- `--processor-params`: Path to processor parameters YAML (default: `gui_configs/processor_params.yaml`)
+- `--dataset-path`: Override the dataset path (default: from `dataset_params.yaml`)
+- `--config-name`: Override the radar config file (default: from `dataset_params.yaml`)
+- `--log-level`: Set logging level (default: INFO)
+
+### More Documentation
+For more detailed information on the GUI architecture, extending the viewer, and processor details, please refer to the documentation in the `docs/` folder:
+- [GUI Documentation](docs/GUI.md)
+- [Processors Documentation](docs/processors.md)
+
+## Velocity Analysis
+
+To perform velocity estimation analysis, use the `scripts/test_vel_estimation.py` script. This script runs the velocity estimation pipeline on a dataset and generates performance metrics and plots compared to ground truth.
+
+### Usage
+
+```bash
+poetry run python scripts/test_vel_estimation.py --config-name velocity_analysis_config.yaml
+```
+
+**Arguments:**
+- `--config-name`: Name of the configuration file located in `analyzer_configs/`. Default: `velocity_analysis_config.yaml`.
+- `--plot-time-series-errors` / `--no-plot-time-series-errors`: Enable/disable plots showing X, Y, Z, and Norm errors over time. Default: Enabled.
+- `--plot-distributions` / `--no-plot-distributions`: Enable/disable CDF and Histogram plots of the error distribution. Default: Enabled.
+- `--plot-histograms` / `--no-plot-histograms`: Enable/disable explicit histogram plots for X, Y, and Z errors. Default: Enabled.
+- `--plot-comparison` / `--no-plot-comparison`: Enable/disable plots comparing Estimated vs Ground Truth velocities for each axis. Default: Enabled.
+- `--plot-stats` / `--no-plot-stats`: Enable/disable plots for R2 statistics and Inlier percentages over time. Default: Enabled.
+
+### Configuration
+
+The analysis is configured via `analyzer_configs/velocity_analysis_config.yaml`. Key sections include:
+
+- **dataset**:
+    - `path`: Root directory of the dataset.
+    - `name`: Name of the specific dataset folder.
+- **radar**: 
+    - `config_file`: Radar config file name.
+    - `array_geometry`: Antenna array geometry (e.g., "ods").
+- **processors**: Parameter dictionaries for specific processors:
+    - `velocity_estimator`: Thresholds for R2 and inliers.
+    - `point_cloud_generator`: Detection and CFAR parameters.
+- **analysis**:
+    - `start_idx`: Start frame index for analysis.
+    - `end_idx`: End frame index.
+    - `error_method`: Method for error calculation, either "signed" (Estimated - GT) or "absolute" (|Estimated - GT|).
+- **transformation**:
+    - `uav_vel_matrix`: 3x3 matrix to transform *Estimated* velocities into the desired frame.
+    - `gt_vel_matrix`: 3x3 matrix to transform *Ground Truth* velocities into the desired frame.
+
+### Output
+
+The script will:
+1. Print summary statistics (Mean, Median, RMSE) for X, Y, Z, and Norm velocity errors to the console.
+2. Display plots for:
+   - Velocity Estimation vs Ground Truth (Time Series)
+   - R2 Statistics and Inlier Percentage
+   - Error Distribution (Histograms and CDFs)

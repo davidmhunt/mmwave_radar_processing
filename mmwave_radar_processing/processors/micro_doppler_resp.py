@@ -8,8 +8,23 @@ class MicroDopplerProcessor(_Processor):
     def __init__(
             self,
             config_manager: ConfigManager,
-            target_ranges:np.ndarray = [0,1.0],
-            num_frames_history:int = 20) -> None:
+            target_ranges: np.ndarray | list = [0, 1.0],
+            num_frames_history: int = 20,
+            **kwargs) -> None:
+        """Initialize the MicroDopplerProcessor.
+
+        Args:
+            config_manager (ConfigManager): The configuration manager.
+            target_ranges (np.ndarray | list, optional): Range window [min, max] to compute 
+                micro-Doppler response over. Defaults to [0, 1.0].
+            num_frames_history (int, optional): Number of frames to keep in history. 
+                Defaults to 20.
+            **kwargs: Additional keyword arguments.
+        """
+        
+        # Convert list to numpy array if necessary
+        if isinstance(target_ranges, list):
+            target_ranges = np.array(target_ranges)
 
         #velocity bins
         self.vel_bins:np.ndarray = None
@@ -27,6 +42,17 @@ class MicroDopplerProcessor(_Processor):
         #load the configuration and configure the response 
         super().__init__(config_manager)
 
+    
+    def reset(self):
+        
+        #reset the micro-doppler response
+        self.micro_doppler_resp = np.zeros(
+            shape=(self.vel_bins.shape[0],self.num_frames_history)
+        )
+
+        super().reset()
+
+        return
     
     def configure(self):
                 
@@ -62,7 +88,7 @@ class MicroDopplerProcessor(_Processor):
         
 
 
-    def process(self, adc_cube: np.ndarray, rx_idx = 0) -> np.ndarray:
+    def process(self, adc_cube: np.ndarray, rx_idx = 0, **kwargs) -> np.ndarray:
 
 
         new_data = adc_cube[rx_idx,:,:]

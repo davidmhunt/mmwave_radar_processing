@@ -6,7 +6,6 @@ from scipy.interpolate import griddata
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
-from mmwave_radar_processing.detectors.CFAR import CaCFAR_1D
 
 class SyntheticArrayBeamformerProcessor(_Processor):
 
@@ -27,7 +26,8 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             max_vel_stdev:np.ndarray=np.array([0.1,0.1,0.1]),
             enable_calibration:bool = False,
             num_calibration_iters:int = 1,
-            interpolated_grid_resolution_m=0.1) -> None:
+            interpolated_grid_resolution_m=0.1,
+            **kwargs) -> None:
         """Initialize the SyntheticArrayBeamformerProcessor.
 
         Args:
@@ -52,11 +52,24 @@ class SyntheticArrayBeamformerProcessor(_Processor):
             enable_calibration (bool, optional): Flag to enable array calibration using targets of opportunity. Defaults to False.
             num_calibration_iters (int, optional): Number of iterations for calibration. Defaults to 1.
             interpolated_grid_resolution_m (float, optional): Grid resolution in meters for interpolating the beamformed response to a Cartesian grid. Defaults to 0.1.
+            **kwargs: Additional keyword arguments.
         Notes:
             NOTE: Coordinate frames are defined as (x - forward, y - left, z - up).
             NOTE: Frames are indexed such that idx=-1 is the most recent frame.
             NOTE: Chirps are indexed such that idx=-1 is the most recent chirp.
         """
+        
+        # Convert lists to numpy arrays if necessary
+        if isinstance(az_angle_bins_rad, list):
+            az_angle_bins_rad = np.array(az_angle_bins_rad)
+        if isinstance(el_angle_bins_rad, list):
+            el_angle_bins_rad = np.array(el_angle_bins_rad)
+        if isinstance(min_vel, list):
+            min_vel = np.array(min_vel)
+        if isinstance(max_vel, list):
+            max_vel = np.array(max_vel)
+        if isinstance(max_vel_stdev, list):
+            max_vel_stdev = np.array(max_vel_stdev)
 
         #sampling parameters
         self.receiver_idx = receiver_idx
@@ -802,15 +815,23 @@ class SyntheticArrayBeamformerProcessor(_Processor):
         
         return new_array_geometry
 
-    def process(self,adc_cube:np.ndarray,current_vel:np.ndarray) -> np.ndarray:
-        """Compute the beamformed synthetic response
+    def process(self,adc_cube:np.ndarray,current_vel:np.ndarray | list) -> np.ndarray:
+        """Compute the beamformed synthetic response.
 
         Args:
-            adc_cube (np.ndarray): the adc cube for the synthetic array
-                indexed by [receiver, sample, and chirp]
+            adc_cube (np.ndarray): The adc cube for the synthetic array
+                indexed by [receiver, sample, and chirp].
+            current_vel (np.ndarray | list): The current velocity of the system as a 3D vector 
+                [vx, vy, vz].
+            **kwargs: Additional keyword arguments.
+
         Returns:
-            np.ndarray: _description_
+            np.ndarray: The beamformed synthetic response.
         """
+        
+        # Convert list to numpy array if necessary
+        if isinstance(current_vel, list):
+            current_vel = np.array(current_vel)
 
         #copy the adc cube to not modify the original
         adc_cube = adc_cube.copy()

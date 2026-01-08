@@ -1,6 +1,7 @@
 import numpy as np
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors.range_resp import RangeProcessor
+from typing import Optional
 
 class Altimeter(RangeProcessor):
     def __init__(
@@ -9,7 +10,8 @@ class Altimeter(RangeProcessor):
             min_altitude_m: float,
             zoom_search_region_m: float,
             altitude_search_limit_m: float,
-            range_bias: float = 0.0) -> None:
+            range_bias: float = 0.0,
+            **kwargs) -> None:
         """
         Args:
             config_manager (ConfigManager): Radar configuration manager.
@@ -19,15 +21,18 @@ class Altimeter(RangeProcessor):
             range_bias (float, optional): Bias to apply to the altitude estimate. Defaults to 0.0.
         """
         super().__init__(config_manager)
-        self.min_altitude_m = min_altitude_m
-        self.zoom_search_region_m = zoom_search_region_m
-        self.altitude_search_limit_m = altitude_search_limit_m
-        self.range_bias = range_bias
+        self.min_altitude_m = float(min_altitude_m)
+        self.zoom_search_region_m = float(zoom_search_region_m)
+        self.altitude_search_limit_m = float(altitude_search_limit_m)
+        self.range_bias = float(range_bias)
+
+        #storing the most recent coarse and fine altitude estimates
+        self.coarse_fft_data: Optional[np.ndarray] = None
         
         
         #currently estimated altitude
-        self.current_altitude_measured_m = min_altitude_m #measured using radar
-        self.current_altitude_corrected_m = min_altitude_m #corrected for bias
+        self.current_altitude_measured_m = self.min_altitude_m #measured using radar
+        self.current_altitude_corrected_m = self.min_altitude_m #corrected for bias
 
     def reset(self):
 
@@ -96,20 +101,21 @@ class Altimeter(RangeProcessor):
         else:
             return -1.0
 
-    def process(self, adc_cube: np.ndarray, precise_est_enabled:bool = True) -> np.ndarray:
-        """
-        Process the ADC cube to estimate the altitude (range to ground).
+    def process(self, adc_cube: np.ndarray, precise_est_enabled: bool = True, **kwargs) -> np.ndarray:
+        """Process the ADC cube to estimate the altitude (range to ground).
 
         Args:
-            adc_cube (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps)
+            adc_cube (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps).
+            precise_est_enabled (bool, optional): If True, use zoom FFT for precise estimation. 
+                Defaults to True.
+            **kwargs: Additional keyword arguments.
 
         Returns:
             np.ndarray: Processed response for altitude estimation.
         """
-
         #compute coarse FFT to get initial range estimate
-        coarse_fft = self._perform_coarse_fft(adc_cube)
-        peak_rng_bins = self._get_coarse_peaks(coarse_fft)
+        self.coarse_fft_data = self._perform_coarse_fft(adc_cube)
+        peak_rng_bins = self._get_coarse_peaks(self.coarse_fft_data)
 
         if peak_rng_bins.size == 0:
             return self.current_altitude_corrected_m

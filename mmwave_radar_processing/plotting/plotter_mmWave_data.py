@@ -160,6 +160,7 @@ class PlotterMmWaveData:
         self,
         resp:np.ndarray,
         range_doppler_processor:RangeDopplerProcessor,
+        dets:np.ndarray = np.empty(shape=(0,2)),
         convert_to_dB=False,
         cmap="viridis",
         ax:plt.Axes=None,
@@ -172,6 +173,8 @@ class PlotterMmWaveData:
                 range doppler response
             range_doppler_processor (RangeDopplerProcessor): RangeDopplerProcessor object
                 used to generate the response
+            dets (np.ndarray, optional): Detected peaks (corresponding to range,doppler idx of detections)
+                 in the response. Defaults to np.empty(shape=(0,2)).
             convert_to_dB (bool, optional): on True, converts the response to a 
                 log scale. Defaults to False.
             cmap (str, optional): the color map used for the generated plot
@@ -204,6 +207,17 @@ class PlotterMmWaveData:
             aspect='auto',
             interpolation='bilinear'
             )
+        
+        if dets.shape[0] > 0:
+            ax.scatter(
+                range_doppler_processor.vel_bins[dets[:,1]],
+                range_doppler_processor.range_bins[dets[:,0]],
+                marker='o',
+                color='red',
+                label=f'{dets.shape[0]} Detected Peaks'
+            )
+            ax.legend()
+
         ax.set_xlabel("Velocity (m/s)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Range (m)",fontsize=self.font_size_axis_labels)
         if convert_to_dB:

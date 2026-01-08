@@ -22,8 +22,8 @@ class VelocityEstimator(DopplerAzimuthProcessor):
             peak_threshold_dB: float = 30.0,
             x_measurement_only: bool = False,
             min_R2_threshold: float = 0.6,
-            min_inlier_percent: float = 0.75
-        ) -> None:
+            min_inlier_percent: float = 0.75,
+            **kwargs) -> None:
         """
         Initialize the VelocityEstimator class.
 
@@ -32,12 +32,18 @@ class VelocityEstimator(DopplerAzimuthProcessor):
             lower_range_bound (float): Lower bound of the range window below a given altitude (in meters).
             upper_range_bound (float): Upper bound of the range window above a given altitude (in meters).
             precise_vel_bound (float, optional): Velocity range for precise FFT computation (in m/s). Defaults to 0.25.
-            valid_angle_range (np.ndarray, optional): Valid angle range for processing in radians. Defaults to np.array([np.deg2rad(-70), np.deg2rad(70)]).
+            valid_angle_range (np.ndarray | list, optional): Valid angle range for processing in radians. 
+                Defaults to np.array([np.deg2rad(-70), np.deg2rad(70)]).
             peak_threshold_dB (float, optional): Threshold for peak detection in Doppler-azimuth responses (in dB). Defaults to 30.0.
             x_measurement_only (bool, optional): If True, only estimate velocity in the x-direction. Defaults to False.
             min_R2_threshold (float, optional): Minimum R-squared value required for valid velocity estimation. Defaults to 0.6.
             min_inlier_percent (float, optional): Minimum percentage of inliers required for robust velocity estimation. Defaults to 0.75.
+            **kwargs: Additional keyword arguments.
         """
+        
+        # Convert list to numpy array if necessary
+        if isinstance(valid_angle_range, list):
+            valid_angle_range = np.array(valid_angle_range)
 
         super().__init__(
             config_manager=config_manager,
@@ -781,18 +787,25 @@ class VelocityEstimator(DopplerAzimuthProcessor):
             adc_cube: np.ndarray = np.empty(shape=0),
             points: np.ndarray = np.empty(shape=0),
             altitude: float = 0.0,
-            enable_precise_responses: bool = False) -> np.ndarray:
+            enable_precise_responses: bool = False,
+            **kwargs) -> np.ndarray:
         """
         Compute the velocity response over a range window centered around a given altitude.
 
         Args:
+        Args:
             adc_cube (np.ndarray): ADC cube indexed by [rx, samp, chirp].
-            points (np.ndarray): Point cloud data.
+            points (np.ndarray | list): Point cloud data.
             altitude (float): Altitude around which the range window is centered.
             enable_precise_responses (bool): If True, additionally compute precise responses for azimuth and elevation.
+            **kwargs: Additional keyword arguments.
         Returns:
             np.ndarray: velocity estimate [vx,vy,vz]
         """
+        
+        # Convert list to numpy array if necessary
+        if isinstance(points, list):
+            points = np.array(points)
         if adc_cube.shape[0] > 0:
             #compute the range window based on the altitude:
             range_window = self.get_range_window(

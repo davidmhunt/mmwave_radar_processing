@@ -1,6 +1,6 @@
 from cpsl_datasets.cpsl_ds import CpslDS
 from mmwave_radar_processing.plotting.movie_generator import MovieGenerator
-from mmwave_radar_processing.plotting.plotter_synthetic_array_data import PlotterSyntheticArrayData
+from mmwave_radar_processing.plotting.archived.plotter_synthetic_array_data import PlotterSyntheticArrayData
 from mmwave_radar_processing.processors.synthetic_array_beamformer_processor_revA import SyntheticArrayBeamformerProcessor
 import numpy as np
 

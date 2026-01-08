@@ -8,7 +8,8 @@ class RangeAngleProcessor(_Processor):
     def __init__(
             self,
             config_manager: ConfigManager,
-            num_angle_bins:int = 64) -> None:
+            num_angle_bins:int = 64,
+            **kwargs) -> None:
 
         #phase shifts
         self.num_angle_bins = num_angle_bins
@@ -64,19 +65,29 @@ class RangeAngleProcessor(_Processor):
 
         return adc_cube_windowed
 
-    def process(self, adc_cube: np.ndarray, chirp_idx = 0, rx_antennas:np.ndarray = np.array([])) -> np.ndarray:
-        """_summary_
+    def process(self,
+                adc_cube: np.ndarray,
+                chirp_idx = 0,
+                rx_antennas:np.ndarray = np.array([]),
+                **kwargs) -> np.ndarray:
+        """Compute the Range-Angle response.
 
         Args:
-            adc_data_cube (np.ndarray): (rx antennas) x (adc samples) x
-                (num_chirps) adc data cube consisting of complex data
+            adc_cube (np.ndarray): (rx antennas) x (adc samples) x (num_chirps) 
+                adc data cube consisting of complex data.
             chirp_idx (int, optional): The chirp to compute the response for.
-              Defaults to 0.
-              rx_antennas (np.ndarray,optional): array of rx antenna indices to use
+                Defaults to 0.
+            rx_antennas (np.ndarray | list, optional): Array or list of rx antenna indices to use.
+                Defaults to empty array.
+            **kwargs: Additional keyword arguments.
 
         Returns:
-            np.ndarray: (range bins) x (angle bins) range azimuth response
+            np.ndarray: (range bins) x (angle bins) range azimuth response.
         """
+        
+        # Convert list to numpy array if necessary
+        if isinstance(rx_antennas, list):
+            rx_antennas = np.array(rx_antennas)
 
         #apply range hanning window
         adc_cube = self.apply_range_angle_hanning_window(adc_cube)

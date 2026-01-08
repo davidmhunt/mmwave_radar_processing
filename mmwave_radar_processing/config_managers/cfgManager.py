@@ -358,3 +358,7 @@ class ConfigManager:
         self.frameCfg_periodicity_ms = float(params[5])
         self.frameCfg_hardware_trigger_enabled = False if int(params[6]) == 1 else True
         self.frameCfg_trigger_delay_ms = float(params[7])
+    
+    ####################################################################
+    #getting receiver positions
+    ####################################################################

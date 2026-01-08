@@ -54,7 +54,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
         """
 
         #get the adc cube
-        adc_cube = self.dataset.get_radar_data(idx)
+        adc_cube = self.dataset.get_radar_adc_data(idx)
 
         ##reformat it with virtual arrays
         adc_cube = self.virtual_array_reformatter.process(adc_cube)
