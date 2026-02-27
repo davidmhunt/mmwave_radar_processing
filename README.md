@@ -189,3 +189,37 @@ The script will:
    - Velocity Estimation vs Ground Truth (Time Series)
    - R2 Statistics and Inlier Percentage
    - Error Distribution (Histograms and CDFs)
+
+## Multi-Dataset Velocity Analysis
+
+To compute summary statistics and produce distribution plots across multiple datasets, use the `scripts/test_multi_vel_estimation.py` script. This script processes every dataset defined in the configuration over all their frames to provide a global view of the velocity estimator's accuracy.
+
+### Usage
+
+```bash
+poetry run python scripts/test_multi_vel_estimation.py --config-name multi_dataset_velocity_analysis_config.yaml
+```
+
+**Arguments:**
+- `--config-name`: Name of the configuration file located in `analyzer_configs/`. Default: `multi_dataset_velocity_analysis_config.yaml`.
+- `--plot-distributions` / `--no-plot-distributions`: Enable/disable CDF and Histogram plots of the error distribution. Default: Enabled.
+- `--plot-histograms` / `--no-plot-histograms`: Enable/disable explicit histogram plots for X, Y, and Z errors. Default: Enabled.
+- `--plot-time-series-errors` / `--no-plot-time-series-errors`: Enable/disable plots showing X, Y, Z, and Norm errors over time. Default: Disabled.
+- `--plot-comparison` / `--no-plot-comparison`: Enable/disable plots comparing Estimated vs Ground Truth velocities for each axis. Default: Disabled.
+- `--plot-stats` / `--no-plot-stats`: Enable/disable plots for R2 statistics and Inlier percentages over time. Default: Disabled.
+
+### Configuration
+
+The analysis is configured via `analyzer_configs/multi_dataset_velocity_analysis_config.yaml`. Key differences from the single-dataset config include:
+
+- **datasets**: A list of dataset dictionaries, each with a `path` and `name`, replacing the single `dataset` item.
+- **analysis**: The `start_idx` and `end_idx` parameters are omitted, as the script automatically processes all frames in each provided dataset.
+
+### Output
+
+The script will:
+1. Print summary statistics (Mean, Median, RMSE) for X, Y, Z, and Norm velocity errors across all datasets to the console.
+2. Display plots for:
+   - Error Distribution (Histograms and CDFs, if enabled)
+   - Velocity Estimation vs Ground Truth (Time Series, if enabled)
+   - R2 Statistics and Inlier Percentage (if enabled)

@@ -72,19 +72,20 @@ class BaseAnalyzer:
         data: np.ndarray
     ) -> Dict[str, float]:
         """
-        Compute summary statistics (Mean, Median, RMSE) for a given dataset.
+        Compute summary statistics (Mean, Median, RMSE, 90% Tail) for a given dataset.
 
         Args:
             data (np.ndarray): Input data array.
 
         Returns:
-            Dict[str, float]: Dictionary containing "Mean", "Median", and "RMSE".
+            Dict[str, float]: Dictionary containing "Mean", "Median", "RMSE", and "90% Tail".
         """
         if data.size == 0:
-            return {"Mean": 0.0, "Median": 0.0, "RMSE": 0.0}
+            return {"Mean": 0.0, "Median": 0.0, "RMSE": 0.0, "90% Tail": 0.0}
 
         return {
-            "Mean": np.mean(data),
-            "Median": np.median(data),
-            "RMSE": np.sqrt(np.mean(data**2))
+            "Mean": float(np.mean(data)),
+            "Median": float(np.median(data)),
+            "RMSE": float(np.sqrt(np.mean(data**2))),
+            "90% Tail": float(np.percentile(np.abs(data), 90))
         }

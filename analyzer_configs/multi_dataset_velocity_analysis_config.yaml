@@ -1,0 +1,52 @@
+datasets:
+  - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/"
+    name: "vicon_box_1"
+  - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/"
+    name: "vicon_box_2"
+  - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/"
+    name: "vicon_box_3"
+  - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/"
+    name: "vicon_box_4"
+  - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/"
+    name: "vicon_diamond_1"
+
+radar:
+  config_file: "6843_RadVel_ods_10Hz.cfg"
+  array_geometry: "ods"
+  array_direction: "down"
+
+processors:
+  velocity_estimator:
+    min_r2_threshold: 0.2
+    min_inlier_percent: 0.5
+  
+  point_cloud_generator:
+    detector_type: "range_doppler_ground_detector"
+    detector_params:
+      vel_cfar_type: "os_cfar_1d"
+      vel_cfar_params:
+        num_train: 12
+        num_guard: 4
+        rho: 0.5
+        alpha: 15
+      altimeter_params:
+        min_altitude_m: 25.0e-2
+        zoom_search_region_m: 20.0e-2
+        altitude_search_limit_m: 40.0e-2
+        range_bias: 0.0
+        precise_est_enabled: true
+    az_antenna_idxs: [0, 3, 4, 7]
+    el_antenna_idxs: [9, 8, 5, 4]
+    shift_az_resp: true
+    shift_el_resp: false
+
+  virtual_array_reformatter: {}
+
+analysis:
+  error_method: "absolute" # "signed" or "absolute"
+
+# Note: analysis start_idx and end_idx are intentionally omitted to process all frames
+
+transformation:
+  uav_vel_matrix: [[0, 1, 0], [0, 0, -1], [1, 0, 0]] # [x, y, z] order input to [x, y, z] output
+  gt_vel_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, -1]] # Identity by default, can be changed

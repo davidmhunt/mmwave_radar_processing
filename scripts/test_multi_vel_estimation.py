@@ -22,13 +22,14 @@ from mmwave_radar_processing.analysis.velocity_analyzer import VelocityAnalyzer
 from mmwave_radar_processing.plotting.analysis_plotter import AnalysisPlotter
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run velocity estimation analysis.")
+    parser = argparse.ArgumentParser(description="Run velocity estimation analysis over multiple datasets.")
     parser.add_argument(
         "--config-name",
         type=str,
-        default="velocity_analysis_config.yaml",
+        default="multi_dataset_velocity_analysis_config.yaml",
         help="Name of the configuration file in analyzer_configs/"
     )
+    # Changed defaults for multi-dataset per user request
     parser.add_argument(
         "--plot-time-series-errors",
         action=argparse.BooleanOptionalAction,
@@ -46,12 +47,6 @@ def parse_args():
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Plot estimated vs ground truth comparison."
-    )
-    parser.add_argument(
-        "--plot-stats",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Plot R2 and Inlier statistics."
     )
     parser.add_argument(
         "--plot-histograms",
@@ -79,7 +74,12 @@ def main():
         config = yaml.safe_load(file)
 
 
-    DATASET_PATH = config['dataset']['path']
+    # Multi-dataset change
+    datasets_config = config.get('datasets', [])
+    if not datasets_config:
+        print("Error: No 'datasets' entry found in the configuration.")
+        sys.exit(1)
+        
     CONFIG_DIRECTORY = os.getenv("CONFIG_DIRECTORY")
 
 
@@ -93,23 +93,6 @@ def main():
 
     cfg_manager.compute_radar_perforance(profile_idx=0)
     cfg_manager.print_cfg_overview()
-
-    # Dataset Loading
-    dataset_name = config['dataset']['name']
-    dataset_path = os.path.join(DATASET_PATH, dataset_name)
-    print(f"Loading dataset from: {dataset_path}")
-
-    dataset = CpslDS(
-        dataset_path=dataset_path,
-        radar_adc_folder="down_radar_adc",
-        lidar_folder="lidar",
-        camera_folder="camera",
-        hand_tracking_folder="hand_tracking",
-        imu_orientation_folder="imu_orientation",
-        imu_full_folder="imu_data",
-        vehicle_vel_folder="vehicle_vel",
-        vehicle_odom_folder="vehicle_odom"
-    )
 
     # Processors Initialization
     processors_cfg = config.get('processors', {})
@@ -139,77 +122,115 @@ def main():
         shift_el_resp=pc_gen_cfg.get('shift_el_resp', False)
     )
 
-    velocity_estimator.reset()
 
-    # Processing Loop
-    for i in tqdm(range(dataset.num_frames)):
-        # Get Data
-        adc_cube = dataset.get_radar_adc_data(i)
-        
-        # Process
-        adc_cube = virtual_array_reformatter.process(adc_cube)
-        radar_pts = point_cloud_generator.process(adc_cube)
-        vehicle_odom = dataset.get_vehicle_odom_data(idx=i)
-        
-        vel_est = velocity_estimator.process(points=radar_pts)
+    all_vel_est = []
+    all_vel_gt = []
 
-        # Transformation matrices
-        uav_vel_matrix = np.array(config['transformation'].get('uav_vel_matrix', np.eye(3)))
-        gt_vel_matrix = np.array(config['transformation'].get('gt_vel_matrix', np.eye(3)))
+    for dataset_idx, ds_cfg in enumerate(datasets_config):
+        dataset_path_dir = ds_cfg.get('path')
+        dataset_name = ds_cfg.get('name')
+        dataset_path = os.path.join(dataset_path_dir, dataset_name)
+        
+        print(f"[{dataset_idx+1}/{len(datasets_config)}] Loading dataset from: {dataset_path}")
+        
+        try:
+            dataset = CpslDS(
+                dataset_path=dataset_path,
+                radar_adc_folder="down_radar_adc",
+                lidar_folder="lidar",
+                camera_folder="camera",
+                hand_tracking_folder="hand_tracking",
+                imu_orientation_folder="imu_orientation",
+                imu_full_folder="imu_data",
+                vehicle_vel_folder="vehicle_vel",
+                vehicle_odom_folder="vehicle_odom"
+            )
+        except Exception as e:
+            print(f"Failed to load dataset {dataset_name}: {e}")
+            continue
 
-        # Transform Estimated Velocity
-        vel_est_uav = uav_vel_matrix @ vel_est
+        velocity_estimator.reset()
 
-        # Transform Ground Truth Velocity
-        
-        raw_gt_x = np.average(vehicle_odom[:, 8])
-        raw_gt_y = np.average(vehicle_odom[:, 9])
-        raw_gt_z = np.average(vehicle_odom[:, 10]) 
-        
-        raw_gt_vel = np.array([raw_gt_x, raw_gt_y, raw_gt_z])
-        gt_vel_uav = gt_vel_matrix @ raw_gt_vel
-        
-        # Update History
-        velocity_estimator.update_history(
-            ground_truth=gt_vel_uav,
-            estimated=vel_est_uav
-        )
+        # Processing Loop across ALL frames of the dataset
+        for i in tqdm(range(dataset.num_frames)):
+            # Get Data
+            # Note: CpslDS.get_radar_adc_data might fail if frame doesn't exist etc. Handling usually internal.
+            adc_cube = dataset.get_radar_adc_data(i)
+            
+            # Process
+            adc_cube = virtual_array_reformatter.process(adc_cube)
+            radar_pts = point_cloud_generator.process(adc_cube)
+            vehicle_odom = dataset.get_vehicle_odom_data(idx=i)
+            
+            vel_est = velocity_estimator.process(points=radar_pts)
+
+            # Transformation matrices
+            uav_vel_matrix = np.array(config['transformation'].get('uav_vel_matrix', np.eye(3)))
+            gt_vel_matrix = np.array(config['transformation'].get('gt_vel_matrix', np.eye(3)))
+
+            # Transform Estimated Velocity
+            vel_est_uav = uav_vel_matrix @ vel_est
+
+            # Transform Ground Truth Velocity
+            
+            raw_gt_x = np.average(vehicle_odom[:, 8])
+            raw_gt_y = np.average(vehicle_odom[:, 9])
+            raw_gt_z = np.average(vehicle_odom[:, 10]) 
+            
+            raw_gt_vel = np.array([raw_gt_x, raw_gt_y, raw_gt_z])
+            gt_vel_uav = gt_vel_matrix @ raw_gt_vel
+            
+            # Update History
+            velocity_estimator.update_history(
+                ground_truth=gt_vel_uav,
+                estimated=vel_est_uav
+            )
+
+        # Collect data for this dataset
+        if len(velocity_estimator.history_estimated) > 0:
+            dataset_vel_est = np.stack(velocity_estimator.history_estimated, axis=0)
+            dataset_vel_gt = np.stack(velocity_estimator.history_gt, axis=0)
+            
+            all_vel_est.append(dataset_vel_est)
+            all_vel_gt.append(dataset_vel_gt)
+
+    if not all_vel_est:
+        print("Error: No data successfully processed across any dataset.")
+        sys.exit(1)
 
     # --- Analysis ---
-    vel_est = np.stack(velocity_estimator.history_estimated, axis=0)
-    vel_gt = np.stack(velocity_estimator.history_gt, axis=0)
+    # Concatenate all datasets' estimations and ground truths
+    vel_est = np.concatenate(all_vel_est, axis=0)
+    vel_gt = np.concatenate(all_vel_gt, axis=0)
 
-    start_idx = config['analysis'].get('start_idx', 0)
-    end_idx = config['analysis'].get('end_idx', len(vel_est))
-    end_idx = min(end_idx, len(vel_est))
-    
-    error_method = config['analysis'].get('error_method', "signed")
+    # Omit start/end index trimming to use all frames seamlessly
+    error_method = config.get('analysis', {}).get('error_method', "signed")
 
-    print(f"Running analysis from frame {start_idx} to {end_idx} using '{error_method}' error method")
+    print(f"Running analysis on {len(vel_est)} total frames using '{error_method}' error method")
 
     analyzer = VelocityAnalyzer()
     analysis_plotter = AnalysisPlotter()
 
     analyzer.analyze(
-        history_estimated=vel_est[start_idx:end_idx],
-        history_gt=vel_gt[start_idx:end_idx],
+        history_estimated=vel_est,
+        history_gt=vel_gt,
         error_method=error_method
     )
 
     summary_df = analyzer.generate_report()
-    print("\nSummary Statistics of Velocity Estimation Errors:")
+    print("\nSummary Statistics of Velocity Estimation Errors (Across All Datasets):")
     print(summary_df.to_string())
     print("\n")
 
     # Plotting
     
-    # 1. Comparison Plot (New)
+    # 1. Comparison Plot
     if args.plot_comparison:
         fig, axs = plt.subplots(3, 1, figsize=(10, 10))
         
         analysis_plotter.plot_comparison_time_series(
-            estimated=vel_est[start_idx:end_idx, 0],
-            ground_truth=vel_gt[start_idx:end_idx, 0],
+            estimated=vel_est[:, 0],
+            ground_truth=vel_gt[:, 0],
             ax=axs[0],
             title="X Velocity Comparison",
             ylabel="Velocity (m/s)",
@@ -217,8 +238,8 @@ def main():
         )
         
         analysis_plotter.plot_comparison_time_series(
-            estimated=vel_est[start_idx:end_idx, 1],
-            ground_truth=vel_gt[start_idx:end_idx, 1],
+            estimated=vel_est[:, 1],
+            ground_truth=vel_gt[:, 1],
             ax=axs[1],
             title="Y Velocity Comparison",
             ylabel="Velocity (m/s)",
@@ -226,8 +247,8 @@ def main():
         )
         
         analysis_plotter.plot_comparison_time_series(
-            estimated=vel_est[start_idx:end_idx, 2],
-            ground_truth=vel_gt[start_idx:end_idx, 2],
+            estimated=vel_est[:, 2],
+            ground_truth=vel_gt[:, 2],
             ax=axs[2],
             title="Z Velocity Comparison",
             ylabel="Velocity (m/s)",
@@ -246,43 +267,17 @@ def main():
                 z_errors=analyzer.get_z_errors(),
                 norm_errors=analyzer.get_norm_errors()
             )
-        else:
-             #TODO Implement this functionality
-             pass
+        elif args.plot_distributions:
+            #TODO: Implement this functionality
+            pass
     
-    # 3. Explicit Histograms (New)
+    # 3. Explicit Histograms
     if args.plot_histograms:
         analysis_plotter.plot_error_histograms(
             x_errors=analyzer.get_x_errors(),
             y_errors=analyzer.get_y_errors(),
             z_errors=analyzer.get_z_errors()
         )
-
-    # 4. Stats
-    if args.plot_stats:
-        r2_stats = np.stack(velocity_estimator.history_R2_statistics, axis=0)
-        inlier_stats = np.stack(velocity_estimator.history_inlier_statistics, axis=0)
-        
-        fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-        analysis_plotter.plot_time_series(
-            data=r2_stats[20:], 
-            ax=axs[0], 
-            title="R2 Statistic Over Time", 
-            ylabel="R2 Statistic",
-            xlabel="Frame Index"
-        )
-        axs[0].set_ylim([0.0, 1])
-
-        analysis_plotter.plot_time_series(
-            data=inlier_stats[20:], 
-            ax=axs[1], 
-            title="Inlier Percentage Over Time", 
-            ylabel="Inlier Percentage",
-            xlabel="Frame Index"
-        )
-        axs[1].set_ylim([0.0, 1])
-        plt.tight_layout()
-        plt.show()
 
 if __name__ == "__main__":
     main()
