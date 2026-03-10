@@ -29,6 +29,12 @@ def parse_args():
         default="multi_dataset_velocity_analysis_config.yaml",
         help="Name of the configuration file in analyzer_configs/"
     )
+    parser.add_argument(
+        "--results-dir",
+        type=str,
+        default="ICaRAus_vel_vs_flow_comparison",#"results",
+        help="Directory to save the results to (relative to where the script is run)."
+    )
     # Changed defaults for multi-dataset per user request
     parser.add_argument(
         "--plot-time-series-errors",
@@ -208,6 +214,9 @@ def main():
 
     print(f"Running analysis on {len(vel_est)} total frames using '{error_method}' error method")
 
+    # Create results directory
+    os.makedirs(args.results_dir, exist_ok=True)
+
     analyzer = VelocityAnalyzer()
     analysis_plotter = AnalysisPlotter()
 
@@ -222,6 +231,10 @@ def main():
     print(summary_df.to_string())
     print("\n")
 
+    csv_path = os.path.join(args.results_dir, "summary_statistics.csv")
+    summary_df.to_csv(csv_path, index=False)
+    print(f"Summary statistics saved to {csv_path}\n")
+
     # Plotting
     
     # 1. Comparison Plot
@@ -234,7 +247,8 @@ def main():
             ax=axs[0],
             title="X Velocity Comparison",
             ylabel="Velocity (m/s)",
-            est_color="red", gt_color="black"
+            est_color="red", gt_color="black",
+            show=False
         )
         
         analysis_plotter.plot_comparison_time_series(
@@ -243,7 +257,8 @@ def main():
             ax=axs[1],
             title="Y Velocity Comparison",
             ylabel="Velocity (m/s)",
-            est_color="green", gt_color="black"
+            est_color="green", gt_color="black",
+            show=False
         )
         
         analysis_plotter.plot_comparison_time_series(
@@ -252,32 +267,50 @@ def main():
             ax=axs[2],
             title="Z Velocity Comparison",
             ylabel="Velocity (m/s)",
-            est_color="blue", gt_color="black"
+            est_color="blue", gt_color="black",
+            show=False
         )
         plt.tight_layout()
-        plt.show()
+        comp_path = os.path.join(args.results_dir, "comparison_time_series.png")
+        fig.savefig(comp_path)
+        plt.close(fig)
+        print(f"Saved comparison plot to {comp_path}")
 
     # 2. Time Series Errors and Distributions
     if args.plot_time_series_errors or args.plot_distributions:
         
         if args.plot_time_series_errors and args.plot_distributions:
+            fig, axs = plt.subplots(2, 1, figsize=(12, 12), gridspec_kw={'height_ratios': [2, 1]})
             analysis_plotter.plot_velocity_analysis_summary(
                 x_errors=analyzer.get_x_errors(),
                 y_errors=analyzer.get_y_errors(),
                 z_errors=analyzer.get_z_errors(),
-                norm_errors=analyzer.get_norm_errors()
+                norm_errors=analyzer.get_norm_errors(),
+                axs=axs,
+                show=False
             )
+            summary_path = os.path.join(args.results_dir, "velocity_analysis_summary.png")
+            fig.savefig(summary_path)
+            plt.close(fig)
+            print(f"Saved velocity analysis summary plot to {summary_path}")
         elif args.plot_distributions:
             #TODO: Implement this functionality
             pass
     
     # 3. Explicit Histograms
     if args.plot_histograms:
+        fig, axs = plt.subplots(3, 1, figsize=(10, 12))
         analysis_plotter.plot_error_histograms(
             x_errors=analyzer.get_x_errors(),
             y_errors=analyzer.get_y_errors(),
-            z_errors=analyzer.get_z_errors()
+            z_errors=analyzer.get_z_errors(),
+            axs=axs,
+            show=False
         )
+        hist_path = os.path.join(args.results_dir, "error_histograms.png")
+        fig.savefig(hist_path)
+        plt.close(fig)
+        print(f"Saved error histograms plot to {hist_path}")
 
 if __name__ == "__main__":
     main()
