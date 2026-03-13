@@ -49,8 +49,8 @@ class RangeAngleProcessor(_Processor):
 
         #compute the mesh grid
         self.thetas,self.rhos = np.meshgrid(self.angle_bins,self.range_bins)
-        self.x_s = np.multiply(self.rhos,np.cos(self.thetas))
-        self.y_s = np.multiply(self.rhos,np.sin(self.thetas))
+        self.x_s = np.multiply(self.rhos,np.cos(self.thetas)) #pointing out
+        self.y_s = np.multiply(self.rhos,np.sin(self.thetas)) #pointing left/right
     
     def apply_range_angle_hanning_window(self,
             adc_cube: np.ndarray):
