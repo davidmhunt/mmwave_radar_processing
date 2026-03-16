@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+import numpy as np
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from mmwave_radar_processing.logging.logger import get_logger
@@ -65,7 +66,7 @@ class ViewController(QObject):
         self.logger.info("Processors initialized: %s", list(self.processors.keys()))
 
     def process_frame(
-        self, adc_cube: Any, history_buffer: Any, processor_params: Dict[str, Any]
+        self, adc_cube: Any, history_buffer: Any, processor_params: Dict[str, Any], velocity_ned: Optional[np.ndarray] = None
     ) -> None:
         """Process a frame using all active processors.
 
@@ -89,9 +90,15 @@ class ViewController(QObject):
                     if len(history_buffer) < spec.num_frames_history:
                         # Not enough history yet
                         continue
-                    result = processor.process(adc_cube=adc_cube, **params)
+                    if spec.requires_velocity and velocity_ned is not None:
+                        result = processor.process(adc_cube=adc_cube, velocity_ned=velocity_ned, **params)
+                    else:
+                        result = processor.process(adc_cube=adc_cube, **params)
                 else:
-                    result = processor.process(adc_cube=adc_cube, **params)
+                    if spec.requires_velocity and velocity_ned is not None:
+                        result = processor.process(adc_cube=adc_cube, velocity_ned=velocity_ned, **params)
+                    else:
+                        result = processor.process(adc_cube=adc_cube, **params)
 
                 # Construct payload dynamically based on view_keys
                 payload = {"data": result}

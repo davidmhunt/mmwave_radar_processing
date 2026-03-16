@@ -13,6 +13,7 @@ from mmwave_radar_processing.logging.logger import get_logger
 from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
 from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerProcessor
 from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProcessor
+from mmwave_radar_processing.processors.range_angle_resp_dbs_enhanced import RangeAngleProcessorDBSEnhanced
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.range_resp import RangeProcessor
 from mmwave_radar_processing.processors.range_doppler_detection.range_doppler_detector_2d import RangeDopplerDetector2D
@@ -34,6 +35,7 @@ class ProcessorSpec:
     required_inputs: Optional[str]
     output_schema: Optional[str]
     enabled: bool = True
+    requires_velocity: bool = False
     num_frames_history: int = 1
     view_keys: Optional[list[str]] = None
 
@@ -108,6 +110,18 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             required_inputs="adc_cube",
             output_schema="range_bins x angle_bins ndarray",
             enabled=True,
+            num_frames_history=1,
+            view_keys=["range_bins", "angle_bins"],
+        ),
+        "range_angle_resp_dbs_enhanced": ProcessorSpec(
+            key="range_angle_resp_dbs_enhanced",
+            display_name="Range-Angle DBS Enhanced",
+            processor_cls=RangeAngleProcessorDBSEnhanced,
+            view_cls=RangeAngleView,
+            required_inputs="adc_cube, velocity_ned",
+            output_schema="range_bins x angle_bins ndarray",
+            enabled=True,
+            requires_velocity=True,
             num_frames_history=1,
             view_keys=["range_bins", "angle_bins"],
         ),

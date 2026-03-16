@@ -5,9 +5,7 @@ from mmwave_radar_processing.processors._processor import _Processor
 from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProcessor
 
 class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
-    """
-    Range Angle Processor, but enhanced with doppler beam sharpening (DBS)
-    """
+    """Range Angle Processor, but enhanced with doppler beam sharpening (DBS)."""
     def __init__(
             self,
             config_manager: ConfigManager,
@@ -15,6 +13,15 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
             num_angle_bins_dbs_enhanced_response:int = 64,
             min_x_y_vel_dbs:float = 0.25,
             **kwargs) -> None:
+        """Initializes the DBS-enhanced Range-Angle processor.
+
+        Args:
+            config_manager (ConfigManager): Radar configuration manager.
+            num_angle_bins_range_angle_response (int, optional): Number of angle bins for the standard Range-Angle response. Defaults to 64.
+            num_angle_bins_dbs_enhanced_response (int, optional): Number of angle bins for the DBS-enhanced response. Defaults to 64.
+            min_x_y_vel_dbs (float, optional): Minimum required velocity to apply DBS. Defaults to 0.25.
+            **kwargs: Additional keyword arguments passed to the parent processor.
+        """
 
         #angle bins without dbs
         self.angle_bins_no_dbs_enhancement:np.ndarray = None
@@ -37,9 +44,11 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
         )
 
     
-    def configure(self):
-        """
-        Overriding the RangeAngleProcessors configure method to include velocity bins for DBS
+    def configure(self) -> None:
+        """Configures the processor's internal bins and mesh grid.
+
+        Overrides the parent's `configure` method to include velocity bins and 
+        calculate enhanced angle bins for Doppler Beam Sharpening.
         """
         #set the range bins
         self.num_range_bins = self.config_manager.get_num_adc_samples(profile_idx=0)
@@ -79,7 +88,8 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
         #compute the mesh grid (no dbs for now)
         self.compute_mesh_grid()
     
-    def compute_mesh_grid_dbs_enhanced(self):
+    def compute_mesh_grid_dbs_enhanced(self) -> None:
+        """Computes the Cartesian mesh grid specifically for the DBS-enhanced angle bins."""
 
         self.angle_bins = self.angle_bins_dbs_enhanced
 
@@ -88,7 +98,8 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
         self.x_s = np.multiply(self.rhos,np.cos(self.thetas)) #pointing out
         self.y_s = np.multiply(self.rhos,np.sin(self.thetas)) #pointing left/right
 
-    def compute_mesh_grid(self):
+    def compute_mesh_grid(self) -> None:
+        """Computes the standard Cartesian mesh grid without DBS enhancement."""
         
         self.angle_bins = self.angle_bins_no_dbs_enhancement
 
@@ -102,20 +113,16 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
                 chirp_idx = 0,
                 rx_antennas:np.ndarray = np.array([]),
                 **kwargs) -> np.ndarray:
-        """Compute the Range-Angle response (without doppler beam sharpening).
-        Returns original range angle response
+        """Computes the Range-Angle response without Doppler beam sharpening.
 
         Args:
-            adc_cube (np.ndarray): (rx antennas) x (adc samples) x (num_chirps) 
-                adc data cube consisting of complex data.
-            chirp_idx (int, optional): The chirp to compute the response for.
-                Defaults to 0.
-            rx_antennas (np.ndarray | list, optional): Array or list of rx antenna indices to use.
-                Defaults to empty array.
+            adc_cube (np.ndarray): The ADC data cube of complex data, shape (rx antennas, adc samples, num chirps).
+            chirp_idx (int, optional): The chirp index to compute the response for. Defaults to 0.
+            rx_antennas (np.ndarray | list, optional): Array or list of specific RX antenna indices to use. Defaults to empty array.
             **kwargs: Additional keyword arguments.
 
         Returns:
-            np.ndarray: (range bins) x (angle bins) range azimuth response.
+            np.ndarray: The computed Range-Azimuth response, shape (range bins, angle bins).
         """
         #compute the standard mesh grid
         self.compute_mesh_grid()
@@ -131,16 +138,18 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
         self,
         adc_cube:np.ndarray
     ) -> np.ndarray:
-        """Compute the 3D windowed FFT of the adc cube. (used by doppler beam sharpening)
+        """Computes the 3D windowed FFT of the ADC cube.
+
+        Applies Hanning windows across range, velocity, and angle dimensions,
+        and computes the FFT for each dimension. Designed for Doppler beam sharpening.
 
         Args:
-            adc_cube (np.ndarray): (rx antennas) x (adc samples) x (num_chirps) 
-                adc data cube consisting of complex data. NOTE: assumes
-                that any virtual array processing has already been performed
+            adc_cube (np.ndarray): The ADC data cube of complex data, shape (rx antennas, adc samples, num chirps).
+                Assumes any virtual array processing has already been performed.
+
         Returns:
-            np.ndarray: (num_angle_bins) x (adc samples) x (num_chirps) 
-                3D windowed FFT of the adc cube.
-    """
+            np.ndarray: The 3D windowed FFT of the ADC cube, shape (num_angle_bins, adc samples, num_chirps).
+        """
 
         #compute range hanning window
         hanning_window_range = np.hanning(adc_cube.shape[1])
@@ -188,16 +197,15 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
 
         return angle_rng_dop_resp
     
-    def get_dop_vel(self,angle,ego_vel):
-        """
-        Compute the doppler velocity for a given angle and ego velocity
+    def get_dop_vel(self, angle: float, ego_vel: np.ndarray) -> float:
+        """Computes the Doppler velocity for a given angle and platform velocity.
 
         Args:
-            angle (float): angle in radians
-            ego_vel (np.ndarray): (x,y,z) velocity of the platform in NED coordinate frame
+            angle (float): The angle in radians.
+            ego_vel (np.ndarray): The (x, y, z) velocity of the platform in the NED coordinate frame.
 
         Returns:
-            float: doppler velocity
+            float: The calculated Doppler velocity.
         """
 
         r = np.array([np.cos(angle),np.sin(angle),0])
@@ -210,15 +218,14 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
         velocity_ned:np.ndarray,
         angle_rng_dop_resp_mag:np.ndarray
     ) -> np.ndarray:
-        """
-        Perform doppler beam sharpening on the angle range doppler response
+        """Performs Doppler beam sharpening on the angle-range-Doppler response.
 
         Args:
-            velocity_ned (np.ndarray): (x,y,z) velocity of the platform in NED coordinate frame
-            angle_rng_dop_resp_mag (np.ndarray): (angle bins) x (range bins) x (chirp bins) angle range doppler response in magnitude already
+            velocity_ned (np.ndarray): The (x, y, z) velocity of the platform in the NED coordinate frame.
+            angle_rng_dop_resp_mag (np.ndarray): The magnitude of the angle-range-Doppler response, shape (angle bins, range bins, chirp bins).
 
         Returns:
-            np.ndarray: (angle bins) x (range bins) x (chirp bins) angle range doppler response
+            np.ndarray: The sharpened Range-Angle response, shape (range bins, angle bins).
         """
         
         az_rng_response_dbs = np.zeros_like(
@@ -261,20 +268,16 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
                 velocity_ned:np.ndarray,
                 rx_antennas:np.ndarray = np.array([]),
                 **kwargs) -> np.ndarray:
-        """Compute the Range-Angle response.
+        """Computes the DBS-enhanced Range-Angle response.
 
         Args:
-            adc_cube (np.ndarray): (rx antennas) x (adc samples) x (num_chirps) 
-                adc data cube consisting of complex data.
-            velocity_ned (np.ndarray): (x,y,z)velocity of the platform in NED coordinate frame.
-            chirp_idx (int, optional): The chirp to compute the response for.
-                Defaults to 0.
-            rx_antennas (np.ndarray | list, optional): Array or list of rx antenna indices to use.
-                Defaults to empty array.
+            adc_cube (np.ndarray): The ADC data cube of complex data, shape (rx antennas, adc samples, num chirps).
+            velocity_ned (np.ndarray): The (x, y, z) velocity of the platform in the NED coordinate frame.
+            rx_antennas (np.ndarray | list, optional): Array or list of specific RX antenna indices to use. Defaults to empty array.
             **kwargs: Additional keyword arguments.
 
         Returns:
-            np.ndarray: (range bins) x (angle bins) range azimuth response.
+            np.ndarray: The DBS-enhanced Range-Azimuth response, shape (range bins, angle bins).
         """
 
         #change the mesh grid to the dbs enhanced mesh grid
@@ -306,27 +309,27 @@ class RangeAngleProcessorDBSEnhanced(RangeAngleProcessor):
                 adc_cube: np.ndarray,
                 velocity_ned:np.ndarray,
                 rx_antennas:np.ndarray = np.array([]),
+                chirp_idx:int = 0,
                 **kwargs) -> np.ndarray:
-        """Compute the Range-Angle response.
+        """Computes the Range-Angle response, using DBS if the platform velocity is high enough.
+
+        If the platform's horizontal velocity is less than `self.min_vel_dbs`, it falls back
+        to the standard Range-Angle response computation.
 
         Args:
-            adc_cube (np.ndarray): (rx antennas) x (adc samples) x (num_chirps) 
-                adc data cube consisting of complex data.
-            velocity_ned (np.ndarray): (x,y,z)velocity of the platform in NED coordinate frame.
-            chirp_idx (int, optional): The chirp to compute the response for.
-                Defaults to 0.
-            rx_antennas (np.ndarray | list, optional): Array or list of rx antenna indices to use.
-                Defaults to empty array.
+            adc_cube (np.ndarray): The ADC data cube of complex data, shape (rx antennas, adc samples, num chirps).
+            velocity_ned (np.ndarray): The (x, y, z) velocity of the platform in the NED coordinate frame.
+            rx_antennas (np.ndarray | list, optional): Array or list of specific RX antenna indices to use. Defaults to empty array.
             **kwargs: Additional keyword arguments.
 
         Returns:
-            np.ndarray: (range bins) x (angle bins) range azimuth response.
+            np.ndarray: The computed Range-Azimuth response, shape (range bins, angle bins).
         """
 
         if np.linalg.norm(velocity_ned[0:2]) < self.min_vel_dbs:
             return self.process_no_dbs(
                 adc_cube=adc_cube,
-                chirp_idx=0,
+                chirp_idx=chirp_idx,
                 rx_antennas=rx_antennas,
                 **kwargs
             )

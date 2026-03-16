@@ -3,6 +3,7 @@ import numpy as np
 
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors.range_angle_resp import RangeAngleProcessor
+from mmwave_radar_processing.processors.range_angle_resp_dbs_enhanced import RangeAngleProcessorDBSEnhanced
 from mmwave_radar_processing.processors.range_doppler_resp import RangeDopplerProcessor
 from mmwave_radar_processing.processors.doppler_azimuth_resp import DopplerAzimuthProcessor
 from mmwave_radar_processing.processors.micro_doppler_resp import MicroDopplerProcessor
@@ -36,6 +37,7 @@ class PlotterMmWaveData:
         self,
         resp:np.ndarray,
         range_azimuth_processor:RangeAngleProcessor,
+        velocity_ned:np.ndarray=np.zeros(shape=(1,3)),
         convert_to_dB=False,
         cmap="viridis",
         ax:plt.Axes=None,
@@ -48,6 +50,8 @@ class PlotterMmWaveData:
                 range azimuth response
             range_azimuth_processor (RangeAzimuthProcessor): RangeAzimuthProcessor object
                 used to generate the response
+            velocity_ned (np.ndarray, optional): velocity of the platform in the NED
+                frame. Defaults to np.zeros(shape=(1,3))
             convert_to_dB (bool, optional): on True, converts the response to a 
                 log scale. Defaults to False.
             cmap (str, optional): the color map used for the generated plot
@@ -82,10 +86,16 @@ class PlotterMmWaveData:
 
         ax.set_xlabel("Y (m)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("X (m)",fontsize=self.font_size_axis_labels)
+
+        plot_name = "Range-Azimuth\nHeatmap"
+        if isinstance(range_azimuth_processor,RangeAngleProcessorDBSEnhanced) and\
+            np.linalg.norm(velocity_ned[0:2]) > range_azimuth_processor.min_vel_dbs:
+            plot_name = "Range-Azimuth (DBS)\nHeatmap"
+        
         if convert_to_dB:
-            ax.set_title("Range-Azimuth\nHeatmap (dB Cart.)",fontsize=self.font_size_title)
+            ax.set_title(plot_name + " (dB Cart.)",fontsize=self.font_size_title)
         else:
-            ax.set_title("Range-Azimuth\nHeatmap (mag Cart.)",fontsize=self.font_size_title)
+            ax.set_title(plot_name + " (mag Cart.)",fontsize=self.font_size_title)
         
         ax.tick_params(labelsize=self.font_size_ticks)
 
@@ -97,6 +107,7 @@ class PlotterMmWaveData:
         self,
         resp:np.ndarray,
         range_azimuth_processor:RangeAngleProcessor,
+        velocity_ned:np.ndarray=np.zeros(shape=(1,3)),
         convert_to_dB=False,
         cmap="viridis",
         ax:plt.Axes=None,
@@ -109,6 +120,8 @@ class PlotterMmWaveData:
                 range azimuth response
             range_azimuth_processor (RangeAzimuthProcessor): RangeAzimuthProcessor object
                 used to generate the response
+            velocity_ned (np.ndarray, optional): velocity of the platform in the NED
+                frame. Defaults to np.zeros(shape=(1,3))
             convert_to_dB (bool, optional): on True, converts the response to a 
                 log scale. Defaults to False.
             cmap (str, optional): the color map used for the generated plot
@@ -143,11 +156,16 @@ class PlotterMmWaveData:
         
         ax.set_xlabel("Angle (radians)",fontsize=self.font_size_axis_labels)
         ax.set_ylabel("Range (m)",fontsize=self.font_size_axis_labels)
-        ax.set_title("Range-Azimuth\nHeatmap (Polar.)",fontsize=self.font_size_title)
+
+        plot_name = "Range-Azimuth\nHeatmap"
+        if isinstance(range_azimuth_processor,RangeAngleProcessorDBSEnhanced) and\
+            np.linalg.norm(velocity_ned[0:2]) > range_azimuth_processor.min_vel_dbs:
+            plot_name = "Range-Azimuth (DBS)\nHeatmap"
+        
         if convert_to_dB:
-            ax.set_title("Range-Azimuth\nHeatmap (dB Polar.)",fontsize=self.font_size_title)
+            ax.set_title(plot_name + " (dB Polar.)",fontsize=self.font_size_title)
         else:
-            ax.set_title("Range-Azimuth\nHeatmap (mag Polar.)",fontsize=self.font_size_title)
+            ax.set_title(plot_name + " (mag Polar.)",fontsize=self.font_size_title)
         ax.tick_params(labelsize=self.font_size_ticks)
 
         if show:
@@ -720,6 +738,7 @@ class PlotterMmWaveData:
     def plot_compilation(
             self,
             adc_cube:np.ndarray,
+            velocity_ned:np.ndarray=np.zeros(shape=(1,3)),
             range_doppler_processor:RangeDopplerProcessor=None,
             range_azimuth_processor:RangeAngleProcessor=None,
             doppler_azimuth_processor:DopplerAzimuthProcessor=None,
@@ -779,6 +798,7 @@ class PlotterMmWaveData:
             resp = range_azimuth_processor.process(
                 adc_cube=adc_cube,
                 chirp_idx=chirp_idx,
+                velocity_ned=velocity_ned,
                 rx_antennas=rx_antennas
             )
             self.plot_range_az_resp_cart(

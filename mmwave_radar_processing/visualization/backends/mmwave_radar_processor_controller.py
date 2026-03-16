@@ -218,6 +218,7 @@ class mmWaveRadarProcessorController(QObject):
 
             # 1. Fetch raw ADC data
             adc_cube = self.dataset_model.get_adc_data(frame_idx)
+            velocity_ned = self.dataset_model.get_velocity_ned(frame_idx)
             if adc_cube is None:
                 self.logger.warning("No ADC data for frame %d", frame_idx)
                 return
@@ -234,7 +235,8 @@ class mmWaveRadarProcessorController(QObject):
             self.view_controller.process_frame(
                 adc_cube=adc_cube,
                 history_buffer=self.adc_buffer,
-                processor_params=self.processor_params
+                processor_params=self.processor_params,
+                velocity_ned=velocity_ned
             )
             
             self.frame_processed.emit(frame_idx)

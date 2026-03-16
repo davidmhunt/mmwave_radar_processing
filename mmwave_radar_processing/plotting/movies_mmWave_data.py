@@ -59,6 +59,17 @@ class MovieGeneratorMmWaveData(MovieGenerator):
         ##reformat it with virtual arrays
         adc_cube = self.virtual_array_reformatter.process(adc_cube)
         
+        if self.dataset.vehicle_odom_enabled:
+            vel_data = np.mean(self.dataset.get_vehicle_odom_data(idx)[:,8:11],axis=0)
+            #convert into ned
+            ned_vel_data = np.array([
+                vel_data[0],
+                vel_data[1],
+                vel_data[2]
+            ])
+        else:
+            ned_vel_data = np.zeros(shape=(1,3))
+        
         try:
             camera_view = self.dataset.get_camera_frame(idx)
         except AssertionError:
@@ -67,6 +78,7 @@ class MovieGeneratorMmWaveData(MovieGenerator):
         #generate the figure
         self.plotter.plot_compilation(
             adc_cube=adc_cube,
+            velocity_ned=ned_vel_data,
             range_doppler_processor=self.range_doppler_processor,
             range_azimuth_processor=self.range_azimuth_processor,
             doppler_azimuth_processor=self.doppler_azimuth_processor,

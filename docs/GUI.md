@@ -26,6 +26,7 @@ The processor registry (`mmwave_radar_processing/visualization/backends/processo
 | `range_doppler_resp` | `RangeDopplerProcessor` | `RangeDopplerView` | Active | |
 | `range_resp` | `RangeProcessor` | `RangeResponseView` | Active | |
 | `range_angle_resp` | `RangeAngleProcessor` | `RangeAngleView` | Active | |
+| `range_angle_resp_dbs_enhanced` | `RangeAngleProcessorDBSEnhanced` | `RangeAngleView` | Active | Requires vehicle velocity |
 | `micro_doppler_resp` | `MicroDopplerProcessor` | `MicroDopplerView` | Active | Requires history buffer |
 | `doppler_azimuth_resp` | `DopplerAzimuthProcessor` | `DopplerAzimuthView` | Active | |
 | `altimeter` | `Altimeter` | `AltitudeView` | Active | |
@@ -47,6 +48,7 @@ Each entry in the registry is a `ProcessorSpec` object containing:
 - `required_inputs`: Data required (e.g., "adc_cube").
 - `output_schema`: Description of output format.
 - `enabled`: Boolean flag to enable/disable in the GUI.
+- `requires_velocity`: Boolean flag indicating if the processor requires the vehicle's `velocity_ned` array as an input.
 - `num_frames_history`: Number of previous frames required (e.g., for Micro-Doppler).
 
 ### Adding a New View/Processor
@@ -177,9 +179,9 @@ dataset:
 config:
   # Default radar configuration file to load
   name: 6843_RadVel_ods_20Hz.cfg
-  # Antenna array geometry (e.g., 'ods', 'planar')
-  array_geometry: ods
-  # Array mounting direction
+  # Antenna array geometry ('standard' or 'ods')
+  array_geometry: ods "standard" #"standard" or "ods"
+  # Array mounting direction ('down' or 'out')
   array_direction: down
 ```
 

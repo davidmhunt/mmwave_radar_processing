@@ -1,0 +1,18 @@
+dataset:
+  dataset_path: /data/Hermes/hermes_north_vicon_1
+  radar_folder: ""
+  radar_adc_folder: front_radar_adc
+  radar_pc_folder: ""
+  lidar_folder: lidar
+  camera_folder: camera
+  hand_tracking_folder: hand_tracking
+  leap_motion_image_left_folder: ""
+  leap_motion_image_right_folder: ""
+  imu_orientation_folder: imu_orientation
+  imu_full_folder: imu_data
+  vehicle_vel_folder: vehicle_vel
+  vehicle_odom_folder: vehicle_odom
+config:
+  name: 1843_RadVel_10Hz_lr.cfg
+  array_geometry: standard
+  array_direction: out

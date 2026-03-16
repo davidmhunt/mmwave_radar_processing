@@ -32,6 +32,10 @@ dependencies = [
 ]
 
 [tool.poetry]
+name = "mmwave_radar_processing"
+version = "0.1.0"
+description = ""
+authors = ["David Hunt <dmh89@duke.edu>"]
 packages = [{include = "mmwave_radar_processing"}]
 
 [tool.poetry.group.submodules]

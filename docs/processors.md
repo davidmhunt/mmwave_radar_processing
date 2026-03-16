@@ -15,6 +15,7 @@ The following table summarizes the current status of each processor, its compati
 | **RangeDopplerGroundDetector** | `range_doppler_detector_view` | Active |
 | **RangeDetector** | `range_detector_view` | Active |
 | **RangeAngleProcessor** | `range_angle_view` | None |
+| **RangeAngleProcessorDBSEnhanced** | `range_angle_view` | None |
 | **DopplerAzimuthProcessor** | `doppler_azimuth_view` | Investigate scaling factor in zoom FFT. |
 | **MicroDopplerProcessor** | `micro_doppler_view` | None |
 | **PointCloudGenerator** | `point_cloud_view` | None |
@@ -176,6 +177,33 @@ Computes a Range-Angle map (2D FFT), often referred to as a Range-Azimuth map. I
     ```python
     processor = RangeAngleProcessor(config_manager)
     ra_map = processor.process(adc_cube)
+    ```
+
+### RangeAngleProcessorDBSEnhanced
+**File**: `processors/range_angle_resp_dbs_enhanced.py`
+
+Extends `RangeAngleProcessor` to provide a Range-Angle map enhanced with Doppler Beam Sharpening (DBS). This significantly improves the angular resolution of the radar by leveraging the platform's motion.
+
+*   **Essential Functions**:
+    *   `process(adc_cube, velocity_ned, ...)`: Computes the 2D FFT, calculates the 3D windowed FFT in velocity, and performs Doppler Beam Sharpening if the platform velocity is sufficient.
+
+*   **Parameters**:
+    *   `__init__`:
+        *   `config_manager` (ConfigManager): Radar configuration manager.
+        *   `num_angle_bins_range_angle_response` (int, default=64): Number of angle bins for the standard response.
+        *   `num_angle_bins_dbs_enhanced_response` (int, default=64): Number of angle bins for the enhanced response.
+        *   `min_x_y_vel_dbs` (float, default=0.25): Minimum velocity required to trigger DBS.
+        *   `**kwargs`: Additional keyword arguments.
+    *   `process`:
+        *   `adc_cube` (np.ndarray): (num rx antennas) x (num adc samples) x (num chirps) ADC cube.
+        *   `velocity_ned` (np.ndarray): (3,) array containing the [north, east, down] velocity of the platform.
+        *   `rx_antennas` (np.ndarray | list, default=[]): Specific RX antennas to use.
+        *   `**kwargs`: Additional keyword arguments.
+
+*   **Usage**:
+    ```python
+    processor = RangeAngleProcessorDBSEnhanced(config_manager, min_x_y_vel_dbs=0.5)
+    ra_map_dbs = processor.process(adc_cube, velocity_ned=np.array([1.0, 0.0, 0.0]))
     ```
 
 ### DopplerAzimuthProcessor

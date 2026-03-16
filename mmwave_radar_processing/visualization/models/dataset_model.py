@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+import numpy as np
 import yaml
 
 from cpsl_datasets.cpsl_ds import CpslDS  # type: ignore
@@ -88,3 +89,31 @@ class DatasetModel:
         if self.dataset is None:
             return None
         return self.dataset.get_radar_adc_data(frame_idx)
+
+    def get_velocity_ned(self, frame_idx: int) -> Optional[np.ndarray]:
+        """Get the vehicle velocity in NED frame for a specific frame.
+
+        Args:
+            frame_idx: Index of the frame to retrieve.
+
+        Returns:
+            np.ndarray: (3,) array of [v_north, v_east, v_down] velocity in m/s, or None.
+        """
+        if self.dataset is None:
+            return None
+        
+        try:
+            odom_data = self.dataset.get_vehicle_odom_data(frame_idx)
+            if odom_data is None or odom_data.size == 0:
+                return None
+            
+            vel_data = np.mean(odom_data[:, 8:11], axis=0)
+            ned_vel_data = np.array([
+                vel_data[0],
+                vel_data[1],
+                vel_data[2]
+            ])
+            return ned_vel_data
+        except Exception as exc:
+            self.logger.warning("Failed to get vehicle velocity for frame %d: %s", frame_idx, exc)
+            return None
