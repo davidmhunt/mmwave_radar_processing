@@ -69,6 +69,7 @@ class RangeAngleProcessor(_Processor):
                 adc_cube: np.ndarray,
                 chirp_idx = 0,
                 rx_antennas:np.ndarray = np.array([]),
+                perform_windowing:bool=True,
                 **kwargs) -> np.ndarray:
         """Compute the Range-Angle response.
 
@@ -79,6 +80,8 @@ class RangeAngleProcessor(_Processor):
                 Defaults to 0.
             rx_antennas (np.ndarray | list, optional): Array or list of rx antenna indices to use.
                 Defaults to empty array.
+            perform_windowing (bool, optional): On True, enabled range-angle windowing.
+                Defaults to false.
             **kwargs: Additional keyword arguments.
 
         Returns:
@@ -90,7 +93,8 @@ class RangeAngleProcessor(_Processor):
             rx_antennas = np.array(rx_antennas)
 
         #apply range hanning window
-        adc_cube = self.apply_range_angle_hanning_window(adc_cube)
+        if perform_windowing:
+            adc_cube = self.apply_range_angle_hanning_window(adc_cube)
 
         #screen for specific rx antennas if desired
         if rx_antennas.size > 0:
