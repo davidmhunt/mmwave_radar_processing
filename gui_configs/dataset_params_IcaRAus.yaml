@@ -1,0 +1,18 @@
+dataset:
+  dataset_path: /data/IcaRAus/datasets/UAV/Flow_datasets/vicon_diamond/vicon_diamond_1
+  radar_folder: ""
+  radar_adc_folder: down_radar_adc
+  radar_pc_folder: ""
+  lidar_folder: lidar
+  camera_folder: camera
+  hand_tracking_folder: hand_tracking
+  leap_motion_image_left_folder: ""
+  leap_motion_image_right_folder: ""
+  imu_orientation_folder: imu_orientation
+  imu_full_folder: imu_data
+  vehicle_vel_folder: vehicle_vel
+  vehicle_odom_folder: vehicle_odom
+config:
+  name: 6843_IcaRAus_down.cfg
+  array_geometry: ods
+  array_direction: down

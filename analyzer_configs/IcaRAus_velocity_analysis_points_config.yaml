@@ -1,0 +1,28 @@
+radar:
+  config_file: "6843_RadVel_ods_10Hz.cfg"
+  array_geometry: "ods"
+  array_direction: "down"
+
+dataset:
+  path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_box"
+  name: "vicon_box_1"
+  radar_pc_folder: "radar_combined_pc"
+  vehicle_odom_folder: "vehicle_odom"
+  vicon_folder: "vicon_x500_8"
+
+processors:
+  velocity_estimator:
+    min_r2_threshold: 0.2
+    min_inlier_percent: 0.5
+
+analysis:
+  start_idx: 0
+  end_idx: -1
+  error_method: "absolute"
+
+transformation:
+  # Standard NED to body or similar
+  # For IcaRAus UAV: X-Forward, Y-Right, Z-Down (NED)
+  uav_vel_radar_msmt: [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  odom_vel_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, -1]]
+  vicon_vel_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, -1]]

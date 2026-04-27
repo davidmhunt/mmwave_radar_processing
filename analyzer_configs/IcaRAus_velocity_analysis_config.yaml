@@ -1,0 +1,49 @@
+dataset:
+  path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_box"
+  name: "vicon_box_1"
+
+radar:
+  config_file: "6843_RadVel_ods_10Hz.cfg"
+  array_geometry: "ods"
+  array_direction: "down"
+
+processors:
+  velocity_estimator:
+    min_r2_threshold: 0.2
+    min_inlier_percent: 0.5
+  
+  point_cloud_generator:
+    detector_type: "range_doppler_ground_detector"
+    detector_params:
+      vel_cfar_type: "os_cfar_1d"
+      vel_cfar_params:
+        num_train: 12
+        num_guard: 4
+        rho: 0.5
+        alpha: 15
+      altimeter_params:
+        min_altitude_m: 25.0e-2
+        zoom_search_region_m: 20.0e-2
+        altitude_search_limit_m: 40.0e-2
+        range_bias: 0.0
+        precise_est_enabled: true
+    az_antenna_idxs: [0, 3, 4, 7]
+    el_antenna_idxs: [9, 8, 5, 4]
+    shift_az_resp: true
+    shift_el_resp: false
+
+  virtual_array_reformatter: {}
+
+analysis:
+  start_idx: 100
+  end_idx: 700
+  error_method: "absolute" # "signed" or "absolute"
+
+transformation:
+  # Transforms raw radar velocity to UAV body frame
+  uav_vel_radar_msmt: [[0, 1, 0], [0, 0, -1], [1, 0, 0]] 
+  # Transforms flow/odom velocity (e.g. NED to FLU or just Z-flip)
+  odom_vel_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, -1]]
+  # Transforms MOCAP ground truth (applied after body-frame rotation)
+  # Set Z to -1 to flip between Up/Down convention if needed
+  vicon_vel_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, -1]]

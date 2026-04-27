@@ -59,6 +59,12 @@ def parse_args():
         default=True,
         help="Plot explicit error histograms for X, Y, Z."
     )
+    parser.add_argument(
+        "--takeoff-altitude",
+        type=float,
+        default=0.0,
+        help="Altitude threshold for data recording. frames with abs(altitude) < threshold are ignored."
+    )
     return parser.parse_args()
 
 def main():
@@ -147,18 +153,28 @@ def main():
         adc_cube = dataset.get_radar_adc_data(i)
         
         # Process
+        # Odom check for altitude
+        vehicle_odom = dataset.get_vehicle_odom_data(idx=i)
+        
+        # Filter by takeoff altitude (abs(z))
+        avg_odom = np.mean(vehicle_odom, axis=0)
+        current_alt = abs(avg_odom[3])
+        if current_alt <= args.takeoff_altitude:
+            continue
+
+        # Process
         adc_cube = virtual_array_reformatter.process(adc_cube)
         radar_pts = point_cloud_generator.process(adc_cube)
-        vehicle_odom = dataset.get_vehicle_odom_data(idx=i)
         
         vel_est = velocity_estimator.process(points=radar_pts)
 
         # Transformation matrices
-        uav_vel_matrix = np.array(config['transformation'].get('uav_vel_matrix', np.eye(3)))
-        gt_vel_matrix = np.array(config['transformation'].get('gt_vel_matrix', np.eye(3)))
+        trans_cfg = config.get('transformation', {})
+        uav_vel_radar_msmt_matrix = np.array(trans_cfg.get('uav_vel_radar_msmt', trans_cfg.get('uav_vel_matrix', np.eye(3))))
+        odom_vel_matrix = np.array(trans_cfg.get('odom_vel_matrix', trans_cfg.get('gt_vel_matrix', np.eye(3))))
 
         # Transform Estimated Velocity
-        vel_est_uav = uav_vel_matrix @ vel_est
+        vel_est_uav = uav_vel_radar_msmt_matrix @ vel_est
 
         # Transform Ground Truth Velocity
         
@@ -167,7 +183,7 @@ def main():
         raw_gt_z = np.average(vehicle_odom[:, 10]) 
         
         raw_gt_vel = np.array([raw_gt_x, raw_gt_y, raw_gt_z])
-        gt_vel_uav = gt_vel_matrix @ raw_gt_vel
+        gt_vel_uav = odom_vel_matrix @ raw_gt_vel
         
         # Update History
         velocity_estimator.update_history(
