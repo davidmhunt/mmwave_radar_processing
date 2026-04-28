@@ -93,9 +93,9 @@ def main():
 
     dataset = CpslDS(
         dataset_path=dataset_path,
-        radar_adc_folder="down_radar_adc",
-        vehicle_odom_folder="vehicle_odom",
-        vicon_folder="vicon_x500_8" # Hardcoded as per IcaRAus_gnn_uav_ds_odom_vs_mocap.py
+        radar_adc_folder=config['dataset'].get('radar_adc_folder', "down_radar_adc"),
+        vehicle_odom_folder=config['dataset'].get('vehicle_odom_folder', "vehicle_odom"),
+        vicon_folder=config['dataset'].get('vicon_folder', "vicon_x500_8")
     )
 
     # Processors Initialization
@@ -168,6 +168,10 @@ def main():
     vicon_raw_history = np.array(vicon_raw_history)
     radar_vel_history = np.array(radar_vel_history)
     timestamps = np.array(timestamps)
+    
+    if len(timestamps) == 0:
+        print("No frames passed the takeoff altitude filter. Exiting.")
+        return
 
     # Orientation Handling (NED-base)
     odom_rot = Rotation.from_quat(odom_raw_history[:, [5, 6, 7, 4]])
@@ -207,6 +211,7 @@ def main():
     
     start_idx = config['analysis'].get('start_idx', 0)
     end_idx = config['analysis'].get('end_idx', len(radar_vel_history))
+    if end_idx == -1: end_idx = len(radar_vel_history)
     error_method = config['analysis'].get('error_method', "signed")
 
     analyzer_radar.analyze(

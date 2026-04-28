@@ -79,7 +79,7 @@ def main():
     
     dataset = CpslDS(
         dataset_path=dataset_path,
-        radar_pc_folder=ds_cfg.get('radar_pc_folder', "front_radar_pc"),
+        radar_pc_folder=ds_cfg.get('radar_pc_folder', "radar_combined_pc"),
         vehicle_odom_folder=ds_cfg.get('vehicle_odom_folder', "vehicle_odom"),
         vicon_folder=ds_cfg.get('vicon_folder', "vicon_x500_8")
     )

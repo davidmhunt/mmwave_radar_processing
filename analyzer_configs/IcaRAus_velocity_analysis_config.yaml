@@ -1,6 +1,6 @@
 dataset:
-  path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_box"
-  name: "vicon_box_1"
+  path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_diamond"
+  name: "vicon_diamond_1"
 
 radar:
   config_file: "6843_RadVel_ods_10Hz.cfg"
@@ -35,8 +35,8 @@ processors:
   virtual_array_reformatter: {}
 
 analysis:
-  start_idx: 100
-  end_idx: 700
+  start_idx: 0
+  end_idx: -1
   error_method: "absolute" # "signed" or "absolute"
 
 transformation:
