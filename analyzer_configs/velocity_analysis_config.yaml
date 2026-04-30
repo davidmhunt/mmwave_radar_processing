@@ -11,6 +11,10 @@ processors:
   velocity_estimator:
     min_r2_threshold: 0.2
     min_inlier_percent: 0.5
+    moving_window_size: 5
+    z_score_threshold: 3.0
+    min_std_dev: 0.2
+    outlier_rejection_limit: 5
   
   point_cloud_generator:
     detector_type: "range_doppler_ground_detector"

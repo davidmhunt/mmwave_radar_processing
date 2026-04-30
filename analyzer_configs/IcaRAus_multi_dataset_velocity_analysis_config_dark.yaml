@@ -1,6 +1,8 @@
-dataset:
-  path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_box"
-  name: "vicon_box_4"
+datasets:
+  - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_diamond"
+    name: "vicon_diamond_2_dark"
+  - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_diamond"
+    name: "vicon_diamond_3_dark"
 
 radar:
   config_file: "6843_RadVel_ods_10Hz.cfg"
@@ -10,7 +12,7 @@ radar:
 processors:
   velocity_estimator:
     min_r2_threshold: 0.2
-    min_inlier_percent: 0.5 #was 0.5
+    min_inlier_percent: 0.5
     moving_window_size: 5
     z_score_threshold: 3.0
     min_std_dev: 0.2
@@ -39,15 +41,9 @@ processors:
   virtual_array_reformatter: {}
 
 analysis:
-  start_idx: 0
-  end_idx: -1
-  error_method: "absolute" # "signed" or "absolute"
+  error_method: "absolute"
 
 transformation:
-  # Transforms raw radar velocity to UAV body frame
-  uav_vel_radar_msmt: [[0, 1, 0], [0, 0, -1], [1, 0, 0]] 
-  # Transforms flow/odom velocity (e.g. NED to FLU or just Z-flip)
+  uav_vel_radar_msmt: [[0, 1, 0], [0, 0, -1], [1, 0, 0]]
   odom_vel_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, -1]]
-  # Transforms MOCAP ground truth (applied after body-frame rotation)
-  # Set Z to -1 to flip between Up/Down convention if needed
   vicon_vel_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, -1]]

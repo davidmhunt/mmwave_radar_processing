@@ -51,7 +51,7 @@ def parse_args():
     parser.add_argument(
         "--takeoff-altitude",
         type=float,
-        default=0.0,
+        default=0.25,
         help="Altitude threshold for data recording. frames with abs(altitude) < threshold are ignored."
     )
     return parser.parse_args()
@@ -93,7 +93,11 @@ def main():
     velocity_estimator = VelocityEstimator(
         config_manager=cfg_manager,
         min_R2_threshold=vel_est_cfg.get('min_r2_threshold', 0.6),
-        min_inlier_percent=vel_est_cfg.get('min_inlier_percent', 0.75)
+        min_inlier_percent=vel_est_cfg.get('min_inlier_percent', 0.75),
+        moving_window_size=vel_est_cfg.get('moving_window_size', 10),
+        z_score_threshold=vel_est_cfg.get('z_score_threshold', 3.0),
+        min_std_dev=vel_est_cfg.get('min_std_dev', 0.2),
+        outlier_rejection_limit=vel_est_cfg.get('outlier_rejection_limit', 5)
     )
 
     # Global Accumulators
@@ -138,12 +142,14 @@ def main():
             
             # Filter by takeoff altitude (abs(z))
             current_alt = abs(avg_odom[3])
-            if current_alt <= args.takeoff_altitude:
-                continue
 
             # Radar (from points)
             radar_pts = dataset.get_radar_point_cloud(i)
             vel_est = velocity_estimator.process(points=radar_pts)
+
+            if current_alt <= args.takeoff_altitude:
+                continue
+            
             ds_radar_vel.append(uav_vel_radar_msmt_matrix @ vel_est)
 
             # Record odom and timestamps

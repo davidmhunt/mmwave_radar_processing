@@ -3,6 +3,7 @@ from sklearn.linear_model import LinearRegression,RANSACRegressor
 from sklearn.metrics import r2_score
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
 from mmwave_radar_processing.processors._processor import _Processor
+from collections import deque
 
 class VelocityEstimator(_Processor):
     """Estimate ego velocity using LSQ + Ransac processing.
@@ -16,6 +17,10 @@ class VelocityEstimator(_Processor):
             config_manager: ConfigManager,
             min_R2_threshold: float = 0.6,
             min_inlier_percent: float = 0.75,
+            moving_window_size: int = 10,
+            z_score_threshold: float = 3.0,
+            min_std_dev: float = 0.2,
+            outlier_rejection_limit: int = 5,
             **kwargs) -> None:
         """
         Initialize the VelocityEstimator class.
@@ -41,11 +46,21 @@ class VelocityEstimator(_Processor):
         #extra histories for debugging
         self.history_R2_statistics = []
         self.history_inlier_statistics = []
+        
+        # Statistical outlier detection
+        self.moving_window_size = moving_window_size
+        self.z_score_threshold = z_score_threshold
+        self.min_std_dev = min_std_dev
+        self.outlier_rejection_limit = outlier_rejection_limit
+        self.velocity_history = deque(maxlen=self.moving_window_size)
+        self.consecutive_rejections = 0
     
     def reset(self):
 
         self.history_R2_statistics = []
         self.history_inlier_statistics = []
+        self.velocity_history.clear()
+        self.consecutive_rejections = 0
         return super().reset()
     
     
@@ -171,14 +186,42 @@ class VelocityEstimator(_Processor):
     
     def update_and_check_current_vel_measurements(self):
         """Update the current velocity estimates if the proposed estimates are valid.
-        TODO: Find a better filtering method to improve robustness
+        Uses RANSAC quality metrics and a statistical Z-score check for outlier rejection.
         """
 
-        if self.estimated_R2 >= self.min_R2_threshold and\
+        if self.estimated_R2 >= self.min_R2_threshold and \
             self.inlier_percent >= self.min_inlier_percent:
+            
+            # Step 2: Statistical Outlier Test
+            if len(self.velocity_history) >= 3:
+                history_array = np.array(self.velocity_history)
+                mean_vel = np.mean(history_array, axis=0)
+                std_vel = np.std(history_array, axis=0)
                 
-                self.current_velocity_estimate = self.proposed_velocity_estimate
-                return
+                # Apply minimum std dev floor
+                eff_std_vel = np.maximum(std_vel, self.min_std_dev)
+                
+                # Calculate Z-scores for each axis
+                z_scores = np.abs(self.proposed_velocity_estimate - mean_vel) / eff_std_vel
+                
+                if np.any(z_scores > self.z_score_threshold):
+                    self.consecutive_rejections += 1
+                    
+                    # Stuck-state recovery
+                    if self.consecutive_rejections > self.outlier_rejection_limit:
+                        # Accept anyway and clear history
+                        self.current_velocity_estimate = self.proposed_velocity_estimate
+                        self.velocity_history.clear()
+                        self.velocity_history.append(self.current_velocity_estimate)
+                        self.consecutive_rejections = 0
+                    
+                    # Reject measurement (Zero-Order Hold)
+                    return
+            
+            # If valid (or history too short)
+            self.current_velocity_estimate = self.proposed_velocity_estimate
+            self.velocity_history.append(self.current_velocity_estimate)
+            self.consecutive_rejections = 0
 
     def estimate_ego_velocity_points(
             self,

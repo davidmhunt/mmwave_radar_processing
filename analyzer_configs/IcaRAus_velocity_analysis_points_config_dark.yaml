@@ -4,8 +4,8 @@ radar:
   array_direction: "down"
 
 dataset:
-  path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_box"
-  name: "vicon_box_4"
+  path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_diamond"
+  name: "vicon_diamond_3_dark"
   radar_pc_folder: "radar_combined_pc"
   vehicle_odom_folder: "vehicle_odom"
   vicon_folder: "vicon_x500_8"

@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument(
         "--takeoff-altitude",
         type=float,
-        default=0.0,
+        default=0.25,
         help="Altitude threshold for data recording. frames with abs(altitude) < threshold are ignored."
     )
     # Changed defaults for multi-dataset per user request
@@ -172,8 +172,6 @@ def main():
             # Filter by takeoff altitude (abs(z))
             avg_odom = np.mean(vehicle_odom, axis=0)
             current_alt = abs(avg_odom[3])
-            if current_alt <= args.takeoff_altitude:
-                continue
 
             # Process
             adc_cube = dataset.get_radar_adc_data(i)
@@ -181,6 +179,9 @@ def main():
             radar_pts = point_cloud_generator.process(adc_cube)
             
             vel_est = velocity_estimator.process(points=radar_pts)
+
+            if current_alt <= args.takeoff_altitude:
+                continue
 
             # Transformation matrices
             trans_cfg = config.get('transformation', {})

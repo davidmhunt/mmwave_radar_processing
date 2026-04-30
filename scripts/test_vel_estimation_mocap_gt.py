@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument(
         "--takeoff-altitude",
         type=float,
-        default=0.0,
+        default=0.25,
         help="Altitude threshold for data recording. frames with abs(altitude) < threshold are ignored."
     )
     parser.add_argument(
@@ -104,7 +104,11 @@ def main():
     velocity_estimator = VelocityEstimator(
         config_manager=cfg_manager,
         min_R2_threshold=vel_est_cfg.get('min_r2_threshold', 0.6),
-        min_inlier_percent=vel_est_cfg.get('min_inlier_percent', 0.75)
+        min_inlier_percent=vel_est_cfg.get('min_inlier_percent', 0.75),
+        moving_window_size=vel_est_cfg.get('moving_window_size', 10),
+        z_score_threshold=vel_est_cfg.get('z_score_threshold', 3.0),
+        min_std_dev=vel_est_cfg.get('min_std_dev', 0.2),
+        outlier_rejection_limit=vel_est_cfg.get('outlier_rejection_limit', 5)
     )
     virtual_array_reformatter = VirtualArrayReformatter(config_manager=cfg_manager)
     
@@ -143,14 +147,15 @@ def main():
         
         # Filter by takeoff altitude (abs(z))
         current_alt = abs(avg_odom[3])
-        if current_alt <= args.takeoff_altitude:
-            continue
 
         # Radar processing
         adc_cube = dataset.get_radar_adc_data(i)
         adc_cube = virtual_array_reformatter.process(adc_cube)
         radar_pts = point_cloud_generator.process(adc_cube)
         vel_est = velocity_estimator.process(points=radar_pts)
+        
+        if current_alt <= args.takeoff_altitude:
+            continue
         
         # Transform Estimated Radar Velocity (Body Frame)
         vel_est_uav = uav_vel_radar_msmt_matrix @ vel_est
@@ -290,6 +295,29 @@ def main():
     plt.tight_layout()
     fig.savefig(os.path.join(results_path, "velocity_comparison_mocap.png"))
     plt.close(fig)
+
+    # --- Additional Plotting ---
+
+    # 2. Combined Error Summary Plot (2x2)
+    fig_sum, axs_sum = plt.subplots(2, 2, figsize=(18, 12), gridspec_kw={'height_ratios': [2, 1]})
+    plotter.plot_velocity_analysis_summary(analyzer_flow.get_x_errors(), analyzer_flow.get_y_errors(), analyzer_flow.get_z_errors(), analyzer_flow.get_norm_errors(), axs=axs_sum[:, 0], show=False)
+    axs_sum[0, 0].set_title("Flow: Velocity Estimation Errors Over Time", fontsize=15)
+    plotter.plot_velocity_analysis_summary(analyzer_radar.get_x_errors(), analyzer_radar.get_y_errors(), analyzer_radar.get_z_errors(), analyzer_radar.get_norm_errors(), axs=axs_sum[:, 1], show=False)
+    axs_sum[0, 1].set_title("Radar: Velocity Estimation Errors Over Time", fontsize=15)
+    plt.tight_layout()
+    fig_sum.savefig(os.path.join(results_path, "velocity_analysis_summary_combined.png"))
+    plt.close(fig_sum)
+
+    # 3. Combined Error Histograms (3x2)
+    fig_hist, axs_hist = plt.subplots(3, 2, figsize=(15, 12))
+    plotter.plot_error_histograms(analyzer_flow.get_x_errors(), analyzer_flow.get_y_errors(), analyzer_flow.get_z_errors(), axs=axs_hist[:, 0], show=False)
+    axs_hist[0, 0].set_title(f"Flow: X Velocity Error Distribution\nMean: {np.mean(analyzer_flow.get_x_errors()):.4f}", fontsize=12)
+    plotter.plot_error_histograms(analyzer_radar.get_x_errors(), analyzer_radar.get_y_errors(), analyzer_radar.get_z_errors(), axs=axs_hist[:, 1], show=False)
+    axs_hist[0, 1].set_title(f"Radar: X Velocity Error Distribution\nMean: {np.mean(analyzer_radar.get_x_errors()):.4f}", fontsize=12)
+    plt.tight_layout()
+    fig_hist.savefig(os.path.join(results_path, "error_histograms_combined.png"))
+    plt.close(fig_hist)
+
     print(f"\nResults saved to {results_path}")
 
 if __name__ == "__main__":
