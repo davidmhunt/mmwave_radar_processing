@@ -364,6 +364,18 @@ Located in `scripts/launch_mmwave_viewer.py`.
     -   `--processor-params`: Path to custom processor params YAML.
     -   `--log-level`: Set logging verbosity (INFO, DEBUG).
 
+### `generate_gui_compilation_figure.py`
+Located in `scripts/generate_gui_compilation_figure.py`.
+
+-   **Usage**: Headless script to generate Matplotlib-based still figures using the same processing pipeline as the GUI.
+-   **Command**:
+    ```bash
+    poetry run python scripts/generate_gui_compilation_figure.py --config figure_compilation_config.yaml
+    ```
+-   **Config Search**: The script specifically searches for the provided `--config` file within the `gui_configs` directory.
+-   **Workflow Integration**: This script utilizes the `mmWaveRadarProcessorController` and `ViewController` to process a specific frame and intercept the data payloads. These payloads are then passed to a Matplotlib-based plotting utility to generate a compilation PNG.
+-   **Results**: Figures are saved to the `scripts/results` directory within the submodule.
+
 ---
 
 ## Implementation phases

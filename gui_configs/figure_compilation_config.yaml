@@ -1,0 +1,13 @@
+# Configuration for generating a static compilation figure
+dataset_params: "/home/david/Documents/odometry/submodules/mmwave_radar_processing/gui_configs/dataset_params_IcaRAus.yaml"
+processor_params: "/home/david/Documents/odometry/submodules/mmwave_radar_processing/gui_configs/processor_params.yaml"
+# dataset_path: "/home/david/Documents/odometry/..." # Optional override
+# config_name: "config.cfg" # Optional override
+frame_to_run: 297
+display_in_dB: true
+views_to_display:
+  - "RangeAngleView"
+  - "DopplerAzimuthView"
+  - "RangeDopplerView"
+  - "RangeResponseView"
+output_filename: "compilation_frame_297.png"
