@@ -9,7 +9,8 @@ import os
 import sys
 import yaml
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
+from tqdm import tqdm
 
 from PyQt6.QtWidgets import QApplication
 
@@ -78,7 +79,7 @@ def main() -> None:
     config_name_override = config.get("config_name")
     frame_to_run = config.get("frame_to_run", 0)
     display_in_dB = config.get("display_in_dB", False)
-    views_to_display = config.get("views_to_display", [])
+    processors_to_display = config.get("processors_to_display", [])
     output_filename = config.get("output_filename", "compilation.png")
 
     # Initialize Qt Application (headless)
@@ -105,21 +106,32 @@ def main() -> None:
             key: The processor key.
             payload: The data payload.
         """
-        # Find the view class name for this key
-        spec = registry.get(key)
+        collected_payloads[key] = payload
+
+    # Resolve view names and keys to collect
+    view_types = []
+    view_name_map = {}
+    for proc_key in processors_to_display:
+        spec = registry.get(proc_key)
         if spec and spec.view_cls:
-            view_name = spec.view_cls.__name__
-            collected_payloads[view_name] = payload
+            view_types.append(proc_key)
+            view_name_map[proc_key] = spec.view_cls.__name__
+        else:
+            logger.warning("Processor '%s' not found in registry or has no associated view.", proc_key)
 
-    # Connect to the view_update signal
+    # Run to the specific frame sequentially to build history
+    logger.info("Processing frames up to %d...", frame_to_run)
+    # Process all frames up to the frame BEFORE the desired one
+    for i in tqdm(range(frame_to_run), desc="Building History"):
+        controller.process_next_frame(i)
+
+    # Connect to the view_update signal only for the final frame to collect data
     controller.view_update.connect(on_view_update)
-
-    # Run to the specific frame
-    logger.info("Processing frame %d...", frame_to_run)
+    logger.info("Processing target frame %d...", frame_to_run)
     controller.process_next_frame(frame_to_run)
 
     # Generate the figure
-    logger.info("Generating figure with views: %s", views_to_display)
+    logger.info("Generating figure with resolved views: %s", view_types)
     plotter = PlotterGUIViews()
     
     # Determine output path (relative to the script's directory)
@@ -134,9 +146,10 @@ def main() -> None:
 
     plotter.plot_compilation(
         payloads=collected_payloads,
-        view_types=views_to_display,
+        view_types=view_types,
         convert_to_dB=display_in_dB,
-        output_path=str(output_path)
+        output_path=str(output_path),
+        view_name_map=view_name_map
     )
 
     logger.info("Figure saved to %s", output_path)

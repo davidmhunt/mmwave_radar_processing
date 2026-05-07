@@ -72,40 +72,28 @@ processors:
       range_bias: 0.0
       precise_est_enabled: false
   point_cloud_generator:
-    detector_type: "range_doppler_ground_detector"
+    detector_type: "range_doppler_detector_2d"
     detector_params:
-      vel_cfar_type: "os_cfar_1d"
-      vel_cfar_params:
-        num_train: 12
-        num_guard: 4
-        rho: 0.5
-        alpha: 15
-      altimeter_params:
-        min_altitude_m: 25.0e-2
-        zoom_search_region_m: 20.0e-2
-        altitude_search_limit_m: 40e-2
-        range_bias: 0.0
-        precise_est_enabled: false
+      cfar_type: "os_cfar_2d"
+      cfar_params:
+        num_train: [5,5]
+        num_guard: [3,2]
+        rho: 0.7
+        alpha: 5
     az_antenna_idxs: [0,3,4,7]
     el_antenna_idxs: [9,8,5,4]
     shift_az_resp: true
     shift_el_resp: false
   point_cloud_generator_2d:
-    axis_idxs: [1, 2]
-    detector_type: "range_doppler_ground_detector"
+    axis_idxs: [0, 1]
+    detector_type: "range_doppler_detector_2d"
     detector_params:
-      vel_cfar_type: "os_cfar_1d"
-      vel_cfar_params:
-        num_train: 12
-        num_guard: 4
-        rho: 0.5
-        alpha: 15
-      altimeter_params:
-        min_altitude_m: 25.0e-2
-        zoom_search_region_m: 20.0e-2
-        altitude_search_limit_m: 40e-2
-        range_bias: 0.0
-        precise_est_enabled: false
+      cfar_type: "os_cfar_2d"
+      cfar_params:
+        num_train: [5,5]
+        num_guard: [3,2]
+        rho: 0.7
+        alpha: 5
     az_antenna_idxs: [0,3,4,7]
     el_antenna_idxs: [9,8,5,4]
     shift_az_resp: true

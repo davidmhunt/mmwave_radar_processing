@@ -19,6 +19,7 @@ The following table summarizes the current status of each processor, its compati
 | **DopplerAzimuthProcessor** | `doppler_azimuth_view` | Investigate scaling factor in zoom FFT. |
 | **MicroDopplerProcessor** | `micro_doppler_view` | None |
 | **PointCloudGenerator** | `point_cloud_view` | None |
+| **PointCloudGenerator2D** | `point_cloud_view_2d` | None |
 | **Altimeter** | `altitude_view` | None |
 | **VelocityEstimator** | None | Robust filtering, Standard array elevation support, ODS point-based estimation. |
 | **SyntheticArrayBeamformer** | None | Azimuth selection for interpolation, Calibration improvements. |
@@ -283,9 +284,31 @@ Implements a standard radar signal processing pipeline to generate a 3D point cl
     processor = PointCloudGenerator(config_manager, detector_type="range_doppler_detector_2d", detector_params={...})
     point_cloud = processor.process(adc_cube)
     ```
-*   **Changes to make**
 
-*   **Implementation Notes/Plan**
+### PointCloudGenerator2D
+**File**: `processors/point_cloud_generator.py`
+
+Extends `PointCloudGenerator` to generate a 2D projected point cloud (e.g., XY, XZ, YZ planes). This is useful for top-down or side-view visualizations of radar detections.
+
+*   **Essential Functions**:
+    *   `process(adc_cube)`: Executes the 3D processing chain and filters the output to the selected 2D axes.
+
+*   **Parameters**:
+    *   `__init__`:
+        *   `config_manager` (ConfigManager): Radar configuration manager.
+        *   `axis_idxs` (list[int], default=[0, 1]): Indices of axes to project (0=X, 1=Y, 2=Z).
+        *   `**kwargs`: Additional keyword arguments passed to `PointCloudGenerator`.
+    *   `process`:
+        *   `adc_cube` (np.ndarray): ADC cube data.
+        *   `**kwargs`: Additional keyword arguments.
+
+*   **Usage**:
+    ```python
+    # Generate an XY (Top-Down) projection
+    processor = PointCloudGenerator2D(config_manager, axis_idxs=[0, 1])
+    payload = processor.process(adc_cube)
+    # payload["data"] contains (N, 3) -> [x, y, velocity]
+    ```
 
 
 ### Altimeter

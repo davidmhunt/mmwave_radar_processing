@@ -21,7 +21,7 @@ from mmwave_radar_processing.processors.range_doppler_detection.range_doppler_de
 from mmwave_radar_processing.processors.range_doppler_detection.range_doppler_ground_detector import RangeDopplerGroundDetector
 from mmwave_radar_processing.processors.range_detector import RangeDetector
 from mmwave_radar_processing.processors.altimeter import Altimeter
-from mmwave_radar_processing.processors.point_cloud_generator import PointCloudGenerator
+from mmwave_radar_processing.processors.point_cloud_generator import PointCloudGenerator, PointCloudGenerator2D
 
 
 @dataclass
@@ -77,6 +77,7 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
     )
     from mmwave_radar_processing.visualization.views.point_cloud_view import (
         PointCloudView,
+        PointCloudView2D,
     )
 
     registry = {
@@ -212,6 +213,17 @@ def get_default_registry(logger=None) -> Dict[str, ProcessorSpec]:
             enabled=True,
             num_frames_history=1,
             view_keys=[], # Point cloud view handles raw array or dict
+        ),
+        "point_cloud_generator_2d": ProcessorSpec(
+            key="point_cloud_generator_2d",
+            display_name="Point Cloud (2D)",
+            processor_cls=PointCloudGenerator2D,
+            view_cls=PointCloudView2D,
+            required_inputs="adc_cube",
+            output_schema="N x 3 ndarray (axis1, axis2, vel)",
+            enabled=True,
+            num_frames_history=1,
+            view_keys=["data", "axis_labels"],
         ),
     }
     logger.debug("Default processor registry created with keys: %s", list(registry.keys()))

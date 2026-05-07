@@ -1,6 +1,6 @@
 
 import numpy as np
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Union, Optional, Any
 
 from mmwave_radar_processing.processors._processor import _Processor
 from mmwave_radar_processing.config_managers.cfgManager import ConfigManager
@@ -254,3 +254,55 @@ class PointCloudGenerator(_Processor):
         self.detector.reset()
 
         return super().reset()
+
+
+class PointCloudGenerator2D(PointCloudGenerator):
+    """
+    Generates a 2D point cloud (projection) from raw ADC data.
+    
+    Inherits from PointCloudGenerator but filters the output to selected axes.
+    """
+
+    def __init__(
+        self,
+        config_manager: ConfigManager,
+        axis_idxs: List[int] = [0, 1], # Default to XY
+        **kwargs
+    ):
+        """
+        Initialize the PointCloudGenerator2D.
+
+        Args:
+            config_manager (ConfigManager): Radar configuration manager.
+            axis_idxs (List[int]): Indices of the axes to output (0=x, 1=y, 2=z).
+            **kwargs: Parameters passed to PointCloudGenerator.
+        """
+        self.axis_idxs = axis_idxs
+        self.axis_labels_map = {0: "X (m)", 1: "Y (m)", 2: "Z (m)"}
+        self.axis_labels = [self.axis_labels_map[i] for i in self.axis_idxs]
+        super().__init__(config_manager, **kwargs)
+
+    def process(self, adc_cube: np.ndarray, **kwargs) -> np.ndarray:
+        """
+        Process the ADC cube to generate a 2D point cloud.
+
+        Args:
+            adc_cube (np.ndarray): Input ADC cube.
+            **kwargs: Additional arguments.
+
+        Returns:
+            np.ndarray: N x 3 ndarray (axis1, axis2, velocity)
+        """
+        # Perform standard 3D computation
+        dets_cartesian = super().process(adc_cube, **kwargs)
+
+        if dets_cartesian.shape[0] == 0:
+            return np.empty((0, 3))
+
+        # Filter to selected axes + velocity (last column)
+        axis_data = dets_cartesian[:, self.axis_idxs]
+        velocity = dets_cartesian[:, 3]
+        
+        data_2d = np.column_stack((axis_data, velocity))
+
+        return data_2d

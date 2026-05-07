@@ -1,0 +1,7 @@
+dataset_params: "/home/david/Documents/odometry/submodules/mmwave_radar_processing/gui_configs/dataset_params_IcaRAus.yaml"
+processor_params: "/home/david/Documents/odometry/submodules/mmwave_radar_processing/gui_configs/processor_params.yaml"
+frame_to_run: 20
+display_in_dB: true
+processors_to_display:
+  - "point_cloud_generator"
+output_filename: "readability_test_3d.png"

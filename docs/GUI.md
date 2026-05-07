@@ -37,6 +37,7 @@ The processor registry (`mmwave_radar_processing/visualization/backends/processo
 | `range_doppler_ground_detector` | `RangeDopplerGroundDetector` | `RangeDopplerDetectorView` | Active | |
 | `range_detector` | `RangeDetector` | `RangeDetectorView` | Active | |
 | `point_cloud_generator` | `PointCloudGenerator` | `PointCloudView` | Active | |
+| `point_cloud_generator_2d` | `PointCloudGenerator2D` | `PointCloudView2D` | Active | Supports XY, XZ, YZ projections |
 
 ### Registry Description
 
@@ -373,7 +374,13 @@ Located in `scripts/generate_gui_compilation_figure.py`.
     poetry run python scripts/generate_gui_compilation_figure.py --config figure_compilation_config.yaml
     ```
 -   **Config Search**: The script specifically searches for the provided `--config` file within the `gui_configs` directory.
--   **Workflow Integration**: This script utilizes the `mmWaveRadarProcessorController` and `ViewController` to process a specific frame and intercept the data payloads. These payloads are then passed to a Matplotlib-based plotting utility to generate a compilation PNG.
+-   **Configuration Fields**:
+    - `dataset_params`: Path to `dataset_params.yaml`.
+    - `processor_params`: Path to `processor_params.yaml`.
+    - `processors_to_display`: A list of up to 4 processor keys from the registry (e.g., `range_angle_resp`, `point_cloud_generator`) to include in the compilation figure.
+    - `frame_to_run`: The frame index to visualize. The script will process all prior frames sequentially (showing a progress bar) to ensure history-dependent views (like Micro-Doppler) are correctly populated.
+    - `display_in_dB`: Boolean to toggle dB vs linear scale for heatmaps and plots.
+-   **Workflow Integration**: This script utilizes the `mmWaveRadarProcessorController` and `ViewController` to process the target frame and intercept the data payloads. These payloads are then passed to a Matplotlib-based plotting utility (`PlotterGUIViews`) to generate a compilation PNG.
 -   **Results**: Figures are saved to the `scripts/results` directory within the submodule.
 
 ---
