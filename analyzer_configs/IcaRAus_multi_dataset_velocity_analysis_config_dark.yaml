@@ -3,6 +3,8 @@ datasets:
     name: "vicon_diamond_2_dark"
   - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_diamond"
     name: "vicon_diamond_3_dark"
+  - path: "/data/IcaRAus/datasets/UAV/Flow_datasets/vicon_diamond"
+    name: "vicon_diamond_4_dark"
 
 radar:
   config_file: "6843_RadVel_ods_10Hz.cfg"
